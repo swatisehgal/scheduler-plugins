@@ -7,4 +7,4 @@ require (
 	k8s.io/code-generator v0.18.6
 )
 
-replace k8s.io/noderesourcetopology-api => ../noderesourcetopology-api
+replace k8s.io/noderesourcetopology-api => ../../pkg/apis/noderesourcetopology-api

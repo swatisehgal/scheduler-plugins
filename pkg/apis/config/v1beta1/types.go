@@ -73,3 +73,13 @@ type CapacitySchedulingArgs struct {
 	// KubeConfigPath is the path of kubeconfig.
 	KubeConfigPath *string `json:"kubeconfigpath,omitempty"`
 }
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// NodeResourceTopologyMatchArgs holds arguments used to configure the NodeResourceTopologyMatch plugin
+type NodeResourceTopologyMatchArgs struct {
+	metav1.TypeMeta `json:",inline"`
+
+	KubeConfig *string `json:"kubeconfig,omitempty"`
+	MasterOverride *string `json:"kubeconfig,omitempty"`
+}

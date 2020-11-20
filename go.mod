@@ -19,6 +19,7 @@ require (
 	k8s.io/kube-openapi v0.0.0-20200805222855-6aeccd4b50c6
 	k8s.io/kube-scheduler v0.19.0
 	k8s.io/kubernetes v1.19.0
+	k8s.io/noderesourcetopology-api v0.0.0
 )
 
 replace (
@@ -43,5 +44,6 @@ replace (
 	k8s.io/kubernetes => k8s.io/kubernetes v1.19.0
 	k8s.io/legacy-cloud-providers => k8s.io/legacy-cloud-providers v0.19.0
 	k8s.io/metrics => k8s.io/metrics v0.19.0
+	k8s.io/noderesourcetopology-api => ./pkg/apis/noderesourcetopology-api
 	k8s.io/sample-apiserver => k8s.io/sample-apiserver v0.19.0
 )

@@ -81,5 +81,5 @@ type NodeResourceTopologyMatchArgs struct {
 	metav1.TypeMeta `json:",inline"`
 
 	KubeConfig     *string `json:"kubeconfig,omitempty"`
-	MasterOverride *string `json:"kubeconfig,omitempty"`
+	MasterOverride *string `json:"masteroverride,omitempty"`
 }

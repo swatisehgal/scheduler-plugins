@@ -22,10 +22,9 @@ import (
 	"reflect"
 	"testing"
 
-
 	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	intstr "k8s.io/apimachinery/pkg/util/intstr"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	topologyv1alpha1 "k8s.io/noderesourcetopology-api/pkg/apis/topology/v1alpha1"
@@ -35,35 +34,35 @@ const nicResourceName = "vendor/nic1"
 const notExistingNICResourceName = "vendor/notexistingnic"
 const containerName = "container1"
 
-func makePodByResourceList(resources *v1.ResourceList) (*v1.Pod) {
+func makePodByResourceList(resources *v1.ResourceList) *v1.Pod {
 	return &v1.Pod{Spec: v1.PodSpec{Containers: []v1.Container{{
-				Resources: v1.ResourceRequirements{
-					Requests: *resources,
-				},
-			}},
-		}}
+		Resources: v1.ResourceRequirements{
+			Requests: *resources,
+		},
+	}},
+	}}
 }
 
 func TestTopologyRequests(t *testing.T) {
 	nodes := nodeTopologyMap{}
 	nodes["node1"] = topologyv1alpha1.NodeResourceTopology{
-		ObjectMeta: metav1.ObjectMeta{Name: "node1"},
+		ObjectMeta:       metav1.ObjectMeta{Name: "node1"},
 		TopologyPolicies: []string{string(apiconfig.SingleNUMANodeTopologyManagerPolicy)},
-		Zones: topologyv1alpha1.ZoneMap {
+		Zones: topologyv1alpha1.ZoneMap{
 			"node-0": topologyv1alpha1.Zone{
-				Type: "Node", Resources: topologyv1alpha1.ResourceInfoMap{v1.ResourceCPU: topologyv1alpha1.ResourceInfo{Capacity: intstr.Parse("20"), Allocatable: intstr.Parse("4")}, v1.ResourceMemory: topologyv1alpha1.ResourceInfo{Capacity: intstr.Parse("8Gi"), Allocatable: intstr.Parse("8Gi")}, nicResourceName: topologyv1alpha1.ResourceInfo{Capacity: intstr.Parse("30"), Allocatable: intstr.Parse("10") }},
+				Type: "Node", Resources: topologyv1alpha1.ResourceInfoMap{v1.ResourceCPU: topologyv1alpha1.ResourceInfo{Capacity: intstr.Parse("20"), Allocatable: intstr.Parse("4")}, v1.ResourceMemory: topologyv1alpha1.ResourceInfo{Capacity: intstr.Parse("8Gi"), Allocatable: intstr.Parse("8Gi")}, nicResourceName: topologyv1alpha1.ResourceInfo{Capacity: intstr.Parse("30"), Allocatable: intstr.Parse("10")}},
 			}, "node-1": topologyv1alpha1.Zone{
-				Type: "Node", Resources: topologyv1alpha1.ResourceInfoMap{v1.ResourceCPU: topologyv1alpha1.ResourceInfo{Capacity: intstr.Parse("30"), Allocatable: intstr.Parse("8")}, v1.ResourceMemory: topologyv1alpha1.ResourceInfo{Capacity: intstr.Parse("8Gi"), Allocatable: intstr.Parse("8Gi") }, nicResourceName: topologyv1alpha1.ResourceInfo{Capacity : intstr.Parse("30"), Allocatable: intstr.Parse("10") }}}},
+				Type: "Node", Resources: topologyv1alpha1.ResourceInfoMap{v1.ResourceCPU: topologyv1alpha1.ResourceInfo{Capacity: intstr.Parse("30"), Allocatable: intstr.Parse("8")}, v1.ResourceMemory: topologyv1alpha1.ResourceInfo{Capacity: intstr.Parse("8Gi"), Allocatable: intstr.Parse("8Gi")}, nicResourceName: topologyv1alpha1.ResourceInfo{Capacity: intstr.Parse("30"), Allocatable: intstr.Parse("10")}}}},
 	}
 
 	nodes["node2"] = topologyv1alpha1.NodeResourceTopology{
-		ObjectMeta: metav1.ObjectMeta{Name: "node1"},
+		ObjectMeta:       metav1.ObjectMeta{Name: "node1"},
 		TopologyPolicies: []string{string(apiconfig.SingleNUMANodeTopologyManagerPolicy)},
-		Zones: topologyv1alpha1.ZoneMap {
+		Zones: topologyv1alpha1.ZoneMap{
 			"node-0": topologyv1alpha1.Zone{
-				Type: "Node", Resources: topologyv1alpha1.ResourceInfoMap{v1.ResourceCPU: topologyv1alpha1.ResourceInfo{Capacity: intstr.Parse("20"), Allocatable: intstr.Parse("2")}, v1.ResourceMemory: topologyv1alpha1.ResourceInfo{Capacity: intstr.Parse("8Gi"), Allocatable: intstr.Parse("4Gi")}, nicResourceName: topologyv1alpha1.ResourceInfo{Capacity: intstr.Parse("30"), Allocatable: intstr.Parse("5") }},
+				Type: "Node", Resources: topologyv1alpha1.ResourceInfoMap{v1.ResourceCPU: topologyv1alpha1.ResourceInfo{Capacity: intstr.Parse("20"), Allocatable: intstr.Parse("2")}, v1.ResourceMemory: topologyv1alpha1.ResourceInfo{Capacity: intstr.Parse("8Gi"), Allocatable: intstr.Parse("4Gi")}, nicResourceName: topologyv1alpha1.ResourceInfo{Capacity: intstr.Parse("30"), Allocatable: intstr.Parse("5")}},
 			}, "node-1": topologyv1alpha1.Zone{
-				Type: "Node", Resources: topologyv1alpha1.ResourceInfoMap{v1.ResourceCPU: topologyv1alpha1.ResourceInfo{Capacity: intstr.Parse("30"), Allocatable: intstr.Parse("4")}, v1.ResourceMemory: topologyv1alpha1.ResourceInfo{Capacity: intstr.Parse("8Gi"), Allocatable: intstr.Parse("4Gi") }, nicResourceName: topologyv1alpha1.ResourceInfo{Capacity : intstr.Parse("30"), Allocatable: intstr.Parse("2") }}}},
+				Type: "Node", Resources: topologyv1alpha1.ResourceInfoMap{v1.ResourceCPU: topologyv1alpha1.ResourceInfo{Capacity: intstr.Parse("30"), Allocatable: intstr.Parse("4")}, v1.ResourceMemory: topologyv1alpha1.ResourceInfo{Capacity: intstr.Parse("8Gi"), Allocatable: intstr.Parse("4Gi")}, nicResourceName: topologyv1alpha1.ResourceInfo{Capacity: intstr.Parse("30"), Allocatable: intstr.Parse("2")}}}},
 	}
 	node1Resources := v1.ResourceList{
 		v1.ResourceCPU:    *resource.NewQuantity(12, resource.DecimalSI),
@@ -74,7 +73,7 @@ func TestTopologyRequests(t *testing.T) {
 	node1 := v1.Node{
 		ObjectMeta: metav1.ObjectMeta{Name: "node1"},
 		Status: v1.NodeStatus{
-			Capacity: node1Resources,
+			Capacity:    node1Resources,
 			Allocatable: node1Resources,
 		},
 	}
@@ -85,13 +84,13 @@ func TestTopologyRequests(t *testing.T) {
 		v1.ResourcePods:   *resource.NewQuantity(20, resource.DecimalSI),
 		nicResourceName:   *resource.NewQuantity(7, resource.DecimalSI),
 	}
-	node2 := v1.Node{ ObjectMeta: metav1.ObjectMeta{Name: "node1"}, Status: v1.NodeStatus{
-			Capacity: node2Resources,
-			Allocatable: node2Resources,
-		},
+	node2 := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node1"}, Status: v1.NodeStatus{
+		Capacity:    node2Resources,
+		Allocatable: node2Resources,
+	},
 	}
 
-  // Test different QoS Guaranteed/Burstable/BestEffort
+	// Test different QoS Guaranteed/Burstable/BestEffort
 	topologyTests := []struct {
 		pod            *v1.Pod
 		nodeTopologies *nodeTopologyMap
@@ -100,68 +99,68 @@ func TestTopologyRequests(t *testing.T) {
 		wantStatus     *framework.Status
 	}{
 		{
-			pod: &v1.Pod{Spec: v1.PodSpec{Containers: []v1.Container{{}},}},
+			pod:            &v1.Pod{Spec: v1.PodSpec{Containers: []v1.Container{{}}}},
 			nodeTopologies: &nodes,
-			name: "Best effort QoS, pod fit",
-			node: node1,
-			wantStatus: nil,
+			name:           "Best effort QoS, pod fit",
+			node:           node1,
+			wantStatus:     nil,
 		},
 		{
 			pod: makePodByResourceList(&v1.ResourceList{
-						v1.ResourceCPU: *resource.NewQuantity(2, resource.DecimalSI),
-						v1.ResourceMemory: resource.MustParse("2Gi"),
-						nicResourceName: *resource.NewQuantity(3, resource.DecimalSI),}),
+				v1.ResourceCPU:    *resource.NewQuantity(2, resource.DecimalSI),
+				v1.ResourceMemory: resource.MustParse("2Gi"),
+				nicResourceName:   *resource.NewQuantity(3, resource.DecimalSI)}),
 			nodeTopologies: &nodes,
-			name: "Guaranteed QoS, pod fit",
-			node: node2,
-			wantStatus: nil,
+			name:           "Guaranteed QoS, pod fit",
+			node:           node2,
+			wantStatus:     nil,
 		},
 		{
 			pod: makePodByResourceList(&v1.ResourceList{
-						v1.ResourceCPU: *resource.NewQuantity(4, resource.DecimalSI),
-						nicResourceName: *resource.NewQuantity(3, resource.DecimalSI),}),
+				v1.ResourceCPU:  *resource.NewQuantity(4, resource.DecimalSI),
+				nicResourceName: *resource.NewQuantity(3, resource.DecimalSI)}),
 			nodeTopologies: &nodes,
-			name: "Burstable QoS, pod fit",
-			node: node2,
-			wantStatus: nil,
+			name:           "Burstable QoS, pod fit",
+			node:           node2,
+			wantStatus:     nil,
 		},
 		{
 			pod: makePodByResourceList(&v1.ResourceList{
-						v1.ResourceCPU: *resource.NewQuantity(14, resource.DecimalSI),
-						nicResourceName: *resource.NewQuantity(3, resource.DecimalSI),}),
+				v1.ResourceCPU:  *resource.NewQuantity(14, resource.DecimalSI),
+				nicResourceName: *resource.NewQuantity(3, resource.DecimalSI)}),
 			nodeTopologies: &nodes,
-			name: "Burstable QoS, pod doesn't fit",
-			node: node2,
-			wantStatus: nil, // number of cpu is exceeded, but in case of burstable QoS for cpu resources we rely on fit.go
+			name:           "Burstable QoS, pod doesn't fit",
+			node:           node2,
+			wantStatus:     nil, // number of cpu is exceeded, but in case of burstable QoS for cpu resources we rely on fit.go
 		},
 		{
 			pod: makePodByResourceList(&v1.ResourceList{
-						v1.ResourceCPU: *resource.NewQuantity(4, resource.DecimalSI),
-						nicResourceName: *resource.NewQuantity(11, resource.DecimalSI),}),
+				v1.ResourceCPU:  *resource.NewQuantity(4, resource.DecimalSI),
+				nicResourceName: *resource.NewQuantity(11, resource.DecimalSI)}),
 			nodeTopologies: &nodes,
-			name: "Burstable QoS, pod doesn't fit",
-			node: node2,
-			wantStatus: framework.NewStatus(framework.Unschedulable, fmt.Sprintf("Can't align container: %s", containerName)),
+			name:           "Burstable QoS, pod doesn't fit",
+			node:           node2,
+			wantStatus:     framework.NewStatus(framework.Unschedulable, fmt.Sprintf("Can't align container: %s", containerName)),
 		},
 		{
 			pod: makePodByResourceList(&v1.ResourceList{
-						v1.ResourceCPU: *resource.NewQuantity(9, resource.DecimalSI),
-						v1.ResourceMemory: resource.MustParse("1Gi"),
-						nicResourceName: *resource.NewQuantity(3, resource.DecimalSI),}),
+				v1.ResourceCPU:    *resource.NewQuantity(9, resource.DecimalSI),
+				v1.ResourceMemory: resource.MustParse("1Gi"),
+				nicResourceName:   *resource.NewQuantity(3, resource.DecimalSI)}),
 			nodeTopologies: &nodes,
-			name: "Guaranteed QoS, pod doesn't fit",
-			node: node1,
-			wantStatus: framework.NewStatus(framework.Unschedulable, fmt.Sprintf("Can't align container: %s", containerName)),
+			name:           "Guaranteed QoS, pod doesn't fit",
+			node:           node1,
+			wantStatus:     framework.NewStatus(framework.Unschedulable, fmt.Sprintf("Can't align container: %s", containerName)),
 		},
 		{
 			pod: makePodByResourceList(&v1.ResourceList{
-						v1.ResourceCPU: *resource.NewQuantity(2, resource.DecimalSI),
-						v1.ResourceMemory: resource.MustParse("1Gi"),
-						notExistingNICResourceName: *resource.NewQuantity(0, resource.DecimalSI),}),
+				v1.ResourceCPU:             *resource.NewQuantity(2, resource.DecimalSI),
+				v1.ResourceMemory:          resource.MustParse("1Gi"),
+				notExistingNICResourceName: *resource.NewQuantity(0, resource.DecimalSI)}),
 			nodeTopologies: &nodes,
-			name: "Guaranteed QoS, pod fit",
-			node: node1,
-			wantStatus: nil, //topology_match has to skip request of 0 resources
+			name:           "Guaranteed QoS, pod fit",
+			node:           node1,
+			wantStatus:     nil, //topology_match has to skip request of 0 resources
 		},
 	}
 
@@ -171,7 +170,7 @@ func TestTopologyRequests(t *testing.T) {
 			tm := NodeResourceTopologyMatch{}
 			tm.nodeTopologies = nodes
 			tm.topologyPolicyHandlers = make(PolicyHandlerMap)
-	                tm.topologyPolicyHandlers[apiconfig.SingleNUMANodeTopologyManagerPolicy] = tm
+			tm.topologyPolicyHandlers[apiconfig.SingleNUMANodeTopologyManagerPolicy] = tm
 			nodeInfo.SetNode(&test.node)
 			test.pod.Spec.Containers[0].Name = containerName
 			test.pod.Spec.Containers[0].Resources.Limits = test.pod.Spec.Containers[0].Resources.Requests

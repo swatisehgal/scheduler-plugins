@@ -70,7 +70,7 @@ type NodeResourceTopologyMatch struct {
 }
 
 type NUMANode struct {
-	NUMAID int
+	NUMAID    int
 	Resources v1.ResourceList
 }
 
@@ -87,7 +87,7 @@ func filter(containers []v1.Container, nodes NUMANodeList, qos v1.PodQOSClass) *
 	}
 
 	zeroQuantity := resource.MustParse("0")
-	for _, container := range containers  {
+	for _, container := range containers {
 		bitmask := bm.NewEmptyBitMask()
 		bitmask.Fill()
 		for resource, quantity := range container.Resources.Requests {
@@ -96,7 +96,7 @@ func filter(containers []v1.Container, nodes NUMANodeList, qos v1.PodQOSClass) *
 				numaQuantity, ok := numaNode.Resources[resource]
 				// if can't find requested resource on the node - skip (don't set it as available NUMA node)
 				// if unfound resource has 0 quantity probably this numa node can be considered
-				if !ok && quantity.Cmp(zeroQuantity) != 0{
+				if !ok && quantity.Cmp(zeroQuantity) != 0 {
 					continue
 				}
 				// Check for the following:
@@ -265,10 +265,10 @@ func (tm *NodeResourceTopologyMatch) onTopologyCRDAdd(obj interface{}) {
 // NewNodeResourceTopologyMatch initializes a new plugin and returns it.
 func NewNodeResourceTopologyMatch(args runtime.Object, handle framework.FrameworkHandle) (framework.Plugin, error) {
 	klog.V(5).Infof("creating new NodeResourceTopologyMatch plugin")
-        tcfg, ok := args.(*apiconfig.NodeResourceTopologyMatchArgs)
-        if !ok {
-                return nil, fmt.Errorf("want args to be of type NodeResourceTopologyMatchArgs, got %T", args)
-        }
+	tcfg, ok := args.(*apiconfig.NodeResourceTopologyMatchArgs)
+	if !ok {
+		return nil, fmt.Errorf("want args to be of type NodeResourceTopologyMatchArgs, got %T", args)
+	}
 
 	topologyMatch := &NodeResourceTopologyMatch{}
 

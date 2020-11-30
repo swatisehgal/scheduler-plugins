@@ -28,6 +28,7 @@ import (
 	"sigs.k8s.io/scheduler-plugins/pkg/coscheduling"
 	"sigs.k8s.io/scheduler-plugins/pkg/crossnodepreemption"
 	"sigs.k8s.io/scheduler-plugins/pkg/noderesources"
+	"sigs.k8s.io/scheduler-plugins/pkg/noderesourcetopology"
 	"sigs.k8s.io/scheduler-plugins/pkg/podstate"
 	"sigs.k8s.io/scheduler-plugins/pkg/qos"
 
@@ -45,7 +46,7 @@ func main() {
 		app.WithPlugin(capacityscheduling.Name, capacityscheduling.New),
 		app.WithPlugin(coscheduling.Name, coscheduling.New),
 		app.WithPlugin(noderesources.AllocatableName, noderesources.NewAllocatable),
-		app.WithPlugin(noderesources.NodeResourceTopologyMatchName, noderesources.NewNodeResourceTopologyMatch),
+		app.WithPlugin(noderesourcetopology.NodeResourceTopologyMatchName, noderesourcetopology.NewNodeResourceTopologyMatch),
 		// Sample plugins below.
 		app.WithPlugin(crossnodepreemption.Name, crossnodepreemption.New),
 		app.WithPlugin(podstate.Name, podstate.New),

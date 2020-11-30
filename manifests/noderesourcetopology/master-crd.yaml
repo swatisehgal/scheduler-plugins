@@ -1,0 +1,30 @@
+apiVersion: topology.node.k8s.io/v1alpha1
+kind: NodeResourceTopology
+metadata:
+  name: kind-control-plane
+topologyPolicy: "SingleNUMANode"
+zones:
+  node-0:
+    type: Node
+    resources:
+      cpu:
+        capacity: "4"
+        allocatable: "3"
+      example.com/deviceA:
+        capacity: "1"
+        allocatable: "1"
+      example.com/deviceB:
+        capacity: "2"
+        allocatable: "2"
+  node-1:
+    type: Node
+    resources:
+      cpu:
+        capacity: "4"
+        allocatable: "3"
+      example.com/deviceA:
+        capacity: "2"
+        allocatable: "2"
+      example.com/deviceB:
+        capacity: "1"
+        allocatable: "1"

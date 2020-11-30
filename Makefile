@@ -15,9 +15,11 @@
 COMMONENVVAR=GOOS=$(shell uname -s | tr A-Z a-z) GOARCH=$(subst x86_64,amd64,$(patsubst i%86,386,$(shell uname -m)))
 BUILDENVVAR=CGO_ENABLED=0
 
-LOCAL_REGISTRY=localhost:5000/scheduler-plugins
-LOCAL_IMAGE=kube-scheduler:latest
-LOCAL_CONTROLLER_IMAGE=controller:latest
+# TODO: Change back to localhost:5000/scheduler-plugins (added for validation and testing purposes)
+LOCAL_REGISTRY=quay.io/swsehgal
+# TODO: Change back to kube-scheduler:latest (added for validation and testing purposes)
+LOCAL_IMAGE=scheduler-plugins-kube-scheduler:latest
+LOCAL_CONTROLLER_IMAGE=scheduler-plugins-controller:latest
 
 # RELEASE_REGISTRY is the container registry to push
 # into. The default is to push to the staging

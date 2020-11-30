@@ -17,8 +17,8 @@ WORKDIR /go/src/sigs.k8s.io/scheduler-plugins
 COPY . .
 ARG RELEASE_VERSION
 RUN RELEASE_VERSION=${RELEASE_VERSION} make build-scheduler
-
-FROM alpine:3.12
+# TODO: Change back to alpine:3.12 (added for validation and testing purposes)
+FROM centos
 
 COPY --from=0 /go/src/sigs.k8s.io/scheduler-plugins/bin/kube-scheduler /bin/kube-scheduler
 

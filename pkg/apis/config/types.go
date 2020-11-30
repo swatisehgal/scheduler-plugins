@@ -41,7 +41,6 @@ type CoschedulingArgs struct {
 // ModeType is a "string" type.
 type ModeType string
 
-
 type TopologyManagerPolicy string
 
 const (
@@ -124,6 +123,6 @@ type TargetLoadPackingArgs struct {
 type NodeResourceTopologyMatchArgs struct {
 	metav1.TypeMeta
 
-	KubeConfig string
+	KubeConfig     string
 	MasterOverride string
 }

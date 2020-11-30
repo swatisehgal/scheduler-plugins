@@ -11,3 +11,11 @@ profiles:
     filter:
       enabled:
       - name: NodeResourceTopologyMatch
+# optional plugin configs
+pluginConfig:
+- name: NodeResourceTopologyMatch
+  args:
+    # kubeconfig: "REPLACE_ME_WITH_KUBE_CONFIG_PATH"
+    kubeconfig: "/etc/kubernetes/scheduler.conf"
+    # masteroverride: "REPLACE_ME_WITH_KUBE_MASTER"
+    masteroverride: "REPLACE_ME_WITH_KUBE_MASTER"

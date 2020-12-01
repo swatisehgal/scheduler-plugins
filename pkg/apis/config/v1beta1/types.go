@@ -80,6 +80,6 @@ type CapacitySchedulingArgs struct {
 type NodeResourceTopologyMatchArgs struct {
 	metav1.TypeMeta `json:",inline"`
 
-	KubeConfig     *string `json:"kubeconfig,omitempty"`
+	KubeConfigPath *string `json:"kubeconfigpath,omitempty"`
 	MasterOverride *string `json:"masteroverride,omitempty"`
 }

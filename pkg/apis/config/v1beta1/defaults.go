@@ -69,3 +69,10 @@ func SetDefaultsCapacitySchedulingArgs(obj *CapacitySchedulingArgs) {
 		obj.KubeConfigPath = &defaultKubeConfigPath
 	}
 }
+
+// SetDefaultsNodeResourceTopologyMatchArgs sets the default parameters for NodeResourceTopologyMatch plugin.
+func SetDefaultsNodeResourceTopologyMatchArgs(obj *NodeResourceTopologyMatchArgs) {
+	if obj.KubeConfigPath == nil {
+		obj.KubeConfigPath = &defaultKubeConfigPath
+	}
+}

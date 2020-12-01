@@ -273,10 +273,10 @@ func NewNodeResourceTopologyMatch(args runtime.Object, handle framework.Framewor
 	topologyMatch := &NodeResourceTopologyMatch{}
 
 	kubeConfig, err := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
-		&clientcmd.ClientConfigLoadingRules{ExplicitPath: tcfg.KubeConfig},
+		&clientcmd.ClientConfigLoadingRules{ExplicitPath: tcfg.KubeConfigPath},
 		&clientcmd.ConfigOverrides{ClusterInfo: clientcmdapi.Cluster{Server: tcfg.MasterOverride}}).ClientConfig()
 	if err != nil {
-		klog.Errorf("Can't create kubeconfig based on: %s, %s, %v", tcfg.KubeConfig, tcfg.MasterOverride, err)
+		klog.Errorf("Can't create kubeconfig based on: %s, %s, %v", tcfg.KubeConfigPath, tcfg.MasterOverride, err)
 		return nil, err
 	}
 

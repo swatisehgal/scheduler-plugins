@@ -123,6 +123,6 @@ type TargetLoadPackingArgs struct {
 type NodeResourceTopologyMatchArgs struct {
 	metav1.TypeMeta
 
-	KubeConfig     string
+	KubeConfigPath string
 	MasterOverride string
 }

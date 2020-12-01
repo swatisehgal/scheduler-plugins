@@ -95,3 +95,10 @@ func SetDefaultTargetLoadPackingArgs(args *TargetLoadPackingArgs) {
 		args.TargetUtilization = &DefaultTargetUtilizationPercent
 	}
 }
+
+// SetDefaultsNodeResourceTopologyMatchArgs sets the default parameters for NodeResourceTopologyMatch plugin.
+func SetDefaultsNodeResourceTopologyMatchArgs(obj *NodeResourceTopologyMatchArgs) {
+	if obj.KubeConfigPath == nil {
+		obj.KubeConfigPath = &defaultKubeConfigPath
+	}
+}

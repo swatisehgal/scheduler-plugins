@@ -121,8 +121,8 @@ func (in *MetricProviderSpec) DeepCopyInto(out *MetricProviderSpec) {
 func (in *NodeResourceTopologyMatchArgs) DeepCopyInto(out *NodeResourceTopologyMatchArgs) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	if in.KubeConfig != nil {
-		in, out := &in.KubeConfig, &out.KubeConfig
+	if in.KubeConfigPath != nil {
+		in, out := &in.KubeConfigPath, &out.KubeConfigPath
 		*out = new(string)
 		**out = **in
 	}

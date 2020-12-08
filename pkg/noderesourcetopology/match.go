@@ -33,11 +33,11 @@ import (
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	bm "k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
-	topologyv1alpha1 "k8s.io/noderesourcetopology-api/pkg/apis/topology/v1alpha1"
-	topoclientset "k8s.io/noderesourcetopology-api/pkg/generated/clientset/versioned"
-	topoinformerexternal "k8s.io/noderesourcetopology-api/pkg/generated/informers/externalversions"
-	topologyinformers "k8s.io/noderesourcetopology-api/pkg/generated/informers/externalversions"
-	topoinformerv1alpha1 "k8s.io/noderesourcetopology-api/pkg/generated/informers/externalversions/topology/v1alpha1"
+	topologyv1alpha1 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha1"
+	topoclientset "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/generated/clientset/versioned"
+	topoinformerexternal "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/generated/informers/externalversions"
+	topologyinformers "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/generated/informers/externalversions"
+	topoinformerv1alpha1 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/generated/informers/externalversions/topology/v1alpha1"
 
 	apiconfig "sigs.k8s.io/scheduler-plugins/pkg/apis/config"
 )
@@ -52,7 +52,7 @@ var _ framework.FilterPlugin = &NodeResourceTopologyMatch{}
 type nodeTopologyMap map[string]topologyv1alpha1.NodeResourceTopology
 
 type PolicyHandler interface {
-	PolicyFilter(pod *v1.Pod, zoneMap topologyv1alpha1.ZoneMap) *framework.Status
+	PolicyFilter(pod *v1.Pod, zoneMap topologyv1alpha1.ZoneList) *framework.Status
 }
 
 type PolicyHandlerMap map[apiconfig.TopologyManagerPolicy]PolicyHandler
@@ -136,18 +136,18 @@ func getTopologyPolicies(nodeTopologies nodeTopologyMap, nodeName string) []apic
 }
 func extractResources(zone topologyv1alpha1.Zone) v1.ResourceList {
 	res := make(v1.ResourceList)
-	for resName, resInfo := range zone.Resources {
+	for _, resInfo := range zone.Resources {
 		quantity, err := resource.ParseQuantity(resInfo.Allocatable.String())
 		if err != nil {
 			klog.Errorf("Failed to parse %s", resInfo.Allocatable.String())
 			continue
 		}
-		res[resName] = quantity
+		res[resInfo.Name] = quantity
 	}
 	return res
 }
 
-func (tm NodeResourceTopologyMatch) PolicyFilter(pod *v1.Pod, zoneMap topologyv1alpha1.ZoneMap) *framework.Status {
+func (tm NodeResourceTopologyMatch) PolicyFilter(pod *v1.Pod, zones topologyv1alpha1.ZoneList) *framework.Status {
 	containers := []v1.Container{}
 	containers = append(pod.Spec.InitContainers, pod.Spec.Containers...)
 
@@ -156,10 +156,10 @@ func (tm NodeResourceTopologyMatch) PolicyFilter(pod *v1.Pod, zoneMap topologyv1
 	// prepare NUMANodes list from zoneMap
 
 	nodes := make(NUMANodeList, 0)
-	for zoneName, zone := range zoneMap {
+	for _, zone := range zones {
 		if zone.Type == "Node" {
 			var numaID int
-			fmt.Sscanf(zoneName, "node-%d", &numaID)
+			fmt.Sscanf(zone.Name, "node-%d", &numaID)
 			resources := extractResources(zone)
 			nodes = append(nodes, NUMANode{NUMAID: numaID, Resources: resources})
 		}

@@ -27,7 +27,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	intstr "k8s.io/apimachinery/pkg/util/intstr"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
-	topologyv1alpha1 "k8s.io/noderesourcetopology-api/pkg/apis/topology/v1alpha1"
+	topologyv1alpha1 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha1"
+
+	apiconfig "sigs.k8s.io/scheduler-plugins/pkg/apis/config"
 )
 
 const nicResourceName = "vendor/nic1"
@@ -48,21 +50,89 @@ func TestTopologyRequests(t *testing.T) {
 	nodes["node1"] = topologyv1alpha1.NodeResourceTopology{
 		ObjectMeta:       metav1.ObjectMeta{Name: "node1"},
 		TopologyPolicies: []string{string(apiconfig.SingleNUMANodeTopologyManagerPolicy)},
-		Zones: topologyv1alpha1.ZoneMap{
-			"node-0": topologyv1alpha1.Zone{
-				Type: "Node", Resources: topologyv1alpha1.ResourceInfoMap{v1.ResourceCPU: topologyv1alpha1.ResourceInfo{Capacity: intstr.Parse("20"), Allocatable: intstr.Parse("4")}, v1.ResourceMemory: topologyv1alpha1.ResourceInfo{Capacity: intstr.Parse("8Gi"), Allocatable: intstr.Parse("8Gi")}, nicResourceName: topologyv1alpha1.ResourceInfo{Capacity: intstr.Parse("30"), Allocatable: intstr.Parse("10")}},
-			}, "node-1": topologyv1alpha1.Zone{
-				Type: "Node", Resources: topologyv1alpha1.ResourceInfoMap{v1.ResourceCPU: topologyv1alpha1.ResourceInfo{Capacity: intstr.Parse("30"), Allocatable: intstr.Parse("8")}, v1.ResourceMemory: topologyv1alpha1.ResourceInfo{Capacity: intstr.Parse("8Gi"), Allocatable: intstr.Parse("8Gi")}, nicResourceName: topologyv1alpha1.ResourceInfo{Capacity: intstr.Parse("30"), Allocatable: intstr.Parse("10")}}}},
+		Zones: topologyv1alpha1.ZoneList{
+			topologyv1alpha1.Zone{
+				Name: "node-0",
+				Type: "Node",
+				Resources: topologyv1alpha1.ResourceInfoList{
+					topologyv1alpha1.ResourceInfo{
+						Name: v1.ResourceCPU,
+						Capacity: intstr.Parse("20"),
+						Allocatable: intstr.Parse("4"),
+					}, topologyv1alpha1.ResourceInfo{
+						Name: v1.ResourceMemory,
+						Capacity: intstr.Parse("8Gi"),
+						Allocatable: intstr.Parse("8Gi"),
+					}, topologyv1alpha1.ResourceInfo{
+						Name: nicResourceName,
+						Capacity: intstr.Parse("30"),
+						Allocatable: intstr.Parse("10"),
+					},
+				},
+			}, topologyv1alpha1.Zone{
+				Name: "node-1",
+				Type: "Node",
+				Resources: topologyv1alpha1.ResourceInfoList{
+					topologyv1alpha1.ResourceInfo{
+						Name: v1.ResourceCPU,
+						Capacity: intstr.Parse("30"),
+						Allocatable: intstr.Parse("8"),
+					}, topologyv1alpha1.ResourceInfo{
+						Name: v1.ResourceMemory,
+						Capacity: intstr.Parse("8Gi"),
+						Allocatable: intstr.Parse("8Gi"),
+					}, topologyv1alpha1.ResourceInfo{
+						Name:  nicResourceName,
+						Capacity: intstr.Parse("30"),
+						Allocatable: intstr.Parse("10"),
+					},
+				},
+			},
+		},
 	}
 
 	nodes["node2"] = topologyv1alpha1.NodeResourceTopology{
 		ObjectMeta:       metav1.ObjectMeta{Name: "node1"},
 		TopologyPolicies: []string{string(apiconfig.SingleNUMANodeTopologyManagerPolicy)},
-		Zones: topologyv1alpha1.ZoneMap{
-			"node-0": topologyv1alpha1.Zone{
-				Type: "Node", Resources: topologyv1alpha1.ResourceInfoMap{v1.ResourceCPU: topologyv1alpha1.ResourceInfo{Capacity: intstr.Parse("20"), Allocatable: intstr.Parse("2")}, v1.ResourceMemory: topologyv1alpha1.ResourceInfo{Capacity: intstr.Parse("8Gi"), Allocatable: intstr.Parse("4Gi")}, nicResourceName: topologyv1alpha1.ResourceInfo{Capacity: intstr.Parse("30"), Allocatable: intstr.Parse("5")}},
-			}, "node-1": topologyv1alpha1.Zone{
-				Type: "Node", Resources: topologyv1alpha1.ResourceInfoMap{v1.ResourceCPU: topologyv1alpha1.ResourceInfo{Capacity: intstr.Parse("30"), Allocatable: intstr.Parse("4")}, v1.ResourceMemory: topologyv1alpha1.ResourceInfo{Capacity: intstr.Parse("8Gi"), Allocatable: intstr.Parse("4Gi")}, nicResourceName: topologyv1alpha1.ResourceInfo{Capacity: intstr.Parse("30"), Allocatable: intstr.Parse("2")}}}},
+		Zones: topologyv1alpha1.ZoneList{
+			topologyv1alpha1.Zone{
+				Name: "node-0",
+				Type: "Node",
+				Resources: topologyv1alpha1.ResourceInfoList{
+					topologyv1alpha1.ResourceInfo{
+						Name: v1.ResourceCPU,
+						Capacity: intstr.Parse("20"),
+						Allocatable: intstr.Parse("2"),
+					}, topologyv1alpha1.ResourceInfo{
+						Name: v1.ResourceMemory,
+						Capacity: intstr.Parse("8Gi"),
+						Allocatable: intstr.Parse("4Gi"),
+					}, topologyv1alpha1.ResourceInfo{
+						Name: nicResourceName,
+						Capacity: intstr.Parse("30"),
+						Allocatable: intstr.Parse("5"),
+					},
+				},
+			}, topologyv1alpha1.Zone{
+				Name: "node-1",
+				Type: "Node",
+				Resources: topologyv1alpha1.ResourceInfoList{
+					topologyv1alpha1.ResourceInfo{
+						Name: v1.ResourceCPU,
+						Capacity: intstr.Parse("30"),
+						Allocatable: intstr.Parse("4"),
+					}, topologyv1alpha1.ResourceInfo{
+						Name: v1.ResourceMemory,
+						Capacity: intstr.Parse("8Gi"),
+						Allocatable: intstr.Parse("4Gi"),
+					}, topologyv1alpha1.ResourceInfo{
+						Name: nicResourceName,
+						Capacity: intstr.Parse("30"),
+						Allocatable: intstr.Parse("2"),
+					},
+				},
+			},
+		},
 	}
 	node1Resources := v1.ResourceList{
 		v1.ResourceCPU:    *resource.NewQuantity(12, resource.DecimalSI),

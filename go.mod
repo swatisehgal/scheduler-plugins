@@ -5,6 +5,7 @@ go 1.15
 require (
 	github.com/google/go-cmp v0.4.0
 	github.com/google/uuid v1.1.1
+	github.com/k8stopologyawareschedwg/noderesourcetopology-api v0.0.5
 	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/spf13/pflag v1.0.5
 	k8s.io/api v0.19.0

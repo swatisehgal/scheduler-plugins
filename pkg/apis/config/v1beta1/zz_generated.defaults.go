@@ -36,6 +36,9 @@ func RegisterDefaults(scheme *runtime.Scheme) error {
 	scheme.AddTypeDefaultingFunc(&TargetLoadPackingArgs{}, func(obj interface{}) {
 		SetObjectDefaultsTargetLoadPackingArgs(obj.(*TargetLoadPackingArgs))
 	})
+	scheme.AddTypeDefaultingFunc(&NodeResourceTopologyMatchArgs{}, func(obj interface{}) {
+		SetDefaultsNodeResourceTopologyMatchArgs(obj.(*NodeResourceTopologyMatchArgs))
+	})
 	return nil
 }
 

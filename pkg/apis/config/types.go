@@ -41,11 +41,17 @@ type CoschedulingArgs struct {
 // ModeType is a "string" type.
 type ModeType string
 
+
+type TopologyManagerPolicy string
+
 const (
 	// Least is the string "Least".
 	Least ModeType = "Least"
 	// Most is the string "Most".
 	Most ModeType = "Most"
+
+	// to preserve consistency keep it in pkg/apis/core/types.go"
+	SingleNUMANodeTopologyManagerPolicy TopologyManagerPolicy = "SingleNUMANode"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -110,4 +116,14 @@ type TargetLoadPackingArgs struct {
 	MetricProvider MetricProviderSpec
 	// Address of load watcher service
 	WatcherAddress string
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// NodeResourceTopologyMatchArgs holds arguments used to configure the NodeResourceTopologyMatch plugin
+type NodeResourceTopologyMatchArgs struct {
+	metav1.TypeMeta
+
+	KubeConfig string
+	MasterOverride string
 }

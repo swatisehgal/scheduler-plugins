@@ -56,11 +56,11 @@ func TestTopologyRequests(t *testing.T) {
 				Type: "Node",
 				Resources: topologyv1alpha1.ResourceInfoList{
 					topologyv1alpha1.ResourceInfo{
-						Name: v1.ResourceCPU,
+						Name: "cpu",
 						Capacity: intstr.Parse("20"),
 						Allocatable: intstr.Parse("4"),
 					}, topologyv1alpha1.ResourceInfo{
-						Name: v1.ResourceMemory,
+						Name: "memory",
 						Capacity: intstr.Parse("8Gi"),
 						Allocatable: intstr.Parse("8Gi"),
 					}, topologyv1alpha1.ResourceInfo{
@@ -74,11 +74,11 @@ func TestTopologyRequests(t *testing.T) {
 				Type: "Node",
 				Resources: topologyv1alpha1.ResourceInfoList{
 					topologyv1alpha1.ResourceInfo{
-						Name: v1.ResourceCPU,
+						Name: "cpu",
 						Capacity: intstr.Parse("30"),
 						Allocatable: intstr.Parse("8"),
 					}, topologyv1alpha1.ResourceInfo{
-						Name: v1.ResourceMemory,
+						Name: "memory",
 						Capacity: intstr.Parse("8Gi"),
 						Allocatable: intstr.Parse("8Gi"),
 					}, topologyv1alpha1.ResourceInfo{
@@ -100,11 +100,11 @@ func TestTopologyRequests(t *testing.T) {
 				Type: "Node",
 				Resources: topologyv1alpha1.ResourceInfoList{
 					topologyv1alpha1.ResourceInfo{
-						Name: v1.ResourceCPU,
+						Name: "cpu",
 						Capacity: intstr.Parse("20"),
 						Allocatable: intstr.Parse("2"),
 					}, topologyv1alpha1.ResourceInfo{
-						Name: v1.ResourceMemory,
+						Name: "memory",
 						Capacity: intstr.Parse("8Gi"),
 						Allocatable: intstr.Parse("4Gi"),
 					}, topologyv1alpha1.ResourceInfo{
@@ -118,11 +118,11 @@ func TestTopologyRequests(t *testing.T) {
 				Type: "Node",
 				Resources: topologyv1alpha1.ResourceInfoList{
 					topologyv1alpha1.ResourceInfo{
-						Name: v1.ResourceCPU,
+						Name: "cpu",
 						Capacity: intstr.Parse("30"),
 						Allocatable: intstr.Parse("4"),
 					}, topologyv1alpha1.ResourceInfo{
-						Name: v1.ResourceMemory,
+						Name: "memory",
 						Capacity: intstr.Parse("8Gi"),
 						Allocatable: intstr.Parse("4Gi"),
 					}, topologyv1alpha1.ResourceInfo{

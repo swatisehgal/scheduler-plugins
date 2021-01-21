@@ -142,7 +142,7 @@ func extractResources(zone topologyv1alpha1.Zone) v1.ResourceList {
 			klog.Errorf("Failed to parse %s", resInfo.Allocatable.String())
 			continue
 		}
-		res[resInfo.Name] = quantity
+		res[v1.ResourceName(resInfo.Name)] = quantity
 	}
 	return res
 }

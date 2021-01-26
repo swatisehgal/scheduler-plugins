@@ -22,12 +22,12 @@ import (
 	"reflect"
 	"testing"
 
+	topologyv1alpha1 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	intstr "k8s.io/apimachinery/pkg/util/intstr"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
-	topologyv1alpha1 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha1"
 
 	apiconfig "sigs.k8s.io/scheduler-plugins/pkg/apis/config"
 )
@@ -56,16 +56,16 @@ func TestTopologyRequests(t *testing.T) {
 				Type: "Node",
 				Resources: topologyv1alpha1.ResourceInfoList{
 					topologyv1alpha1.ResourceInfo{
-						Name: "cpu",
-						Capacity: intstr.Parse("20"),
+						Name:        "cpu",
+						Capacity:    intstr.Parse("20"),
 						Allocatable: intstr.Parse("4"),
 					}, topologyv1alpha1.ResourceInfo{
-						Name: "memory",
-						Capacity: intstr.Parse("8Gi"),
+						Name:        "memory",
+						Capacity:    intstr.Parse("8Gi"),
 						Allocatable: intstr.Parse("8Gi"),
 					}, topologyv1alpha1.ResourceInfo{
-						Name: nicResourceName,
-						Capacity: intstr.Parse("30"),
+						Name:        nicResourceName,
+						Capacity:    intstr.Parse("30"),
 						Allocatable: intstr.Parse("10"),
 					},
 				},
@@ -74,16 +74,16 @@ func TestTopologyRequests(t *testing.T) {
 				Type: "Node",
 				Resources: topologyv1alpha1.ResourceInfoList{
 					topologyv1alpha1.ResourceInfo{
-						Name: "cpu",
-						Capacity: intstr.Parse("30"),
+						Name:        "cpu",
+						Capacity:    intstr.Parse("30"),
 						Allocatable: intstr.Parse("8"),
 					}, topologyv1alpha1.ResourceInfo{
-						Name: "memory",
-						Capacity: intstr.Parse("8Gi"),
+						Name:        "memory",
+						Capacity:    intstr.Parse("8Gi"),
 						Allocatable: intstr.Parse("8Gi"),
 					}, topologyv1alpha1.ResourceInfo{
-						Name:  nicResourceName,
-						Capacity: intstr.Parse("30"),
+						Name:        nicResourceName,
+						Capacity:    intstr.Parse("30"),
 						Allocatable: intstr.Parse("10"),
 					},
 				},
@@ -100,16 +100,16 @@ func TestTopologyRequests(t *testing.T) {
 				Type: "Node",
 				Resources: topologyv1alpha1.ResourceInfoList{
 					topologyv1alpha1.ResourceInfo{
-						Name: "cpu",
-						Capacity: intstr.Parse("20"),
+						Name:        "cpu",
+						Capacity:    intstr.Parse("20"),
 						Allocatable: intstr.Parse("2"),
 					}, topologyv1alpha1.ResourceInfo{
-						Name: "memory",
-						Capacity: intstr.Parse("8Gi"),
+						Name:        "memory",
+						Capacity:    intstr.Parse("8Gi"),
 						Allocatable: intstr.Parse("4Gi"),
 					}, topologyv1alpha1.ResourceInfo{
-						Name: nicResourceName,
-						Capacity: intstr.Parse("30"),
+						Name:        nicResourceName,
+						Capacity:    intstr.Parse("30"),
 						Allocatable: intstr.Parse("5"),
 					},
 				},
@@ -118,16 +118,16 @@ func TestTopologyRequests(t *testing.T) {
 				Type: "Node",
 				Resources: topologyv1alpha1.ResourceInfoList{
 					topologyv1alpha1.ResourceInfo{
-						Name: "cpu",
-						Capacity: intstr.Parse("30"),
+						Name:        "cpu",
+						Capacity:    intstr.Parse("30"),
 						Allocatable: intstr.Parse("4"),
 					}, topologyv1alpha1.ResourceInfo{
-						Name: "memory",
-						Capacity: intstr.Parse("8Gi"),
+						Name:        "memory",
+						Capacity:    intstr.Parse("8Gi"),
 						Allocatable: intstr.Parse("4Gi"),
 					}, topologyv1alpha1.ResourceInfo{
-						Name: nicResourceName,
-						Capacity: intstr.Parse("30"),
+						Name:        nicResourceName,
+						Capacity:    intstr.Parse("30"),
 						Allocatable: intstr.Parse("2"),
 					},
 				},

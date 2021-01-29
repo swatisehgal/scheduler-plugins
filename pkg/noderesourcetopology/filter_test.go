@@ -1,5 +1,5 @@
 /*
-Copyright 2020 The Kubernetes Authors.
+Copyright 2021 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	intstr "k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/klog/v2"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 
 	apiconfig "sigs.k8s.io/scheduler-plugins/pkg/apis/config"
@@ -40,9 +41,42 @@ func makePodByResourceList(resources *v1.ResourceList) *v1.Pod {
 	return &v1.Pod{Spec: v1.PodSpec{Containers: []v1.Container{{
 		Resources: v1.ResourceRequirements{
 			Requests: *resources,
+			Limits:   *resources,
 		},
 	}},
 	}}
+}
+
+func makeResourceListFromZones(zones topologyv1alpha1.ZoneList) v1.ResourceList {
+	result := make(v1.ResourceList)
+	for _, zone := range zones {
+		for _, resInfo := range zone.Resources {
+			resQuantity, err := resource.ParseQuantity(resInfo.Allocatable.String())
+			if err != nil {
+				klog.Errorf("Failed to parse %s", resInfo.Allocatable.String())
+				continue
+			}
+			if quantity, ok := result[v1.ResourceName(resInfo.Name)]; ok {
+				resQuantity.Add(quantity)
+			}
+			result[v1.ResourceName(resInfo.Name)] = resQuantity
+		}
+	}
+	return result
+}
+
+func makePodByResourceListWithManyContainers(resources *v1.ResourceList, containerCount int) *v1.Pod {
+	containers := []v1.Container{}
+
+	for i := 0; i < containerCount; i++ {
+		containers = append(containers, v1.Container{
+			Resources: v1.ResourceRequirements{
+				Requests: *resources,
+				Limits:   *resources,
+			},
+		})
+	}
+	return &v1.Pod{Spec: v1.PodSpec{Containers: containers}}
 }
 
 func TestTopologyRequests(t *testing.T) {
@@ -92,7 +126,7 @@ func TestTopologyRequests(t *testing.T) {
 	}
 
 	nodes["node2"] = topologyv1alpha1.NodeResourceTopology{
-		ObjectMeta:       metav1.ObjectMeta{Name: "node1"},
+		ObjectMeta:       metav1.ObjectMeta{Name: "node2"},
 		TopologyPolicies: []string{string(apiconfig.SingleNUMANodeTopologyManagerPolicy)},
 		Zones: topologyv1alpha1.ZoneList{
 			topologyv1alpha1.Zone{
@@ -134,12 +168,51 @@ func TestTopologyRequests(t *testing.T) {
 			},
 		},
 	}
-	node1Resources := v1.ResourceList{
-		v1.ResourceCPU:    *resource.NewQuantity(12, resource.DecimalSI),
-		v1.ResourceMemory: resource.MustParse("16Gi"),
-		v1.ResourcePods:   *resource.NewQuantity(20, resource.DecimalSI),
-		nicResourceName:   *resource.NewQuantity(14, resource.DecimalSI),
+
+	nodes["node3"] = topologyv1alpha1.NodeResourceTopology{
+		ObjectMeta:       metav1.ObjectMeta{Name: "node3"},
+		TopologyPolicies: []string{string(apiconfig.PodTopologyScope)},
+		Zones: topologyv1alpha1.ZoneList{
+			topologyv1alpha1.Zone{
+				Name: "node-0",
+				Type: "Node",
+				Resources: topologyv1alpha1.ResourceInfoList{
+					topologyv1alpha1.ResourceInfo{
+						Name:        "cpu",
+						Capacity:    intstr.Parse("20"),
+						Allocatable: intstr.Parse("2"),
+					}, topologyv1alpha1.ResourceInfo{
+						Name:        "memory",
+						Capacity:    intstr.Parse("8Gi"),
+						Allocatable: intstr.Parse("4Gi"),
+					}, topologyv1alpha1.ResourceInfo{
+						Name:        nicResourceName,
+						Capacity:    intstr.Parse("30"),
+						Allocatable: intstr.Parse("5"),
+					},
+				},
+			}, topologyv1alpha1.Zone{
+				Name: "node-1",
+				Type: "Node",
+				Resources: topologyv1alpha1.ResourceInfoList{
+					topologyv1alpha1.ResourceInfo{
+						Name:        "cpu",
+						Capacity:    intstr.Parse("30"),
+						Allocatable: intstr.Parse("4"),
+					}, topologyv1alpha1.ResourceInfo{
+						Name:        "memory",
+						Capacity:    intstr.Parse("8Gi"),
+						Allocatable: intstr.Parse("4Gi"),
+					}, topologyv1alpha1.ResourceInfo{
+						Name:        nicResourceName,
+						Capacity:    intstr.Parse("30"),
+						Allocatable: intstr.Parse("2"),
+					},
+				},
+			},
+		},
 	}
+	node1Resources := makeResourceListFromZones(nodes["node1"].Zones)
 	node1 := v1.Node{
 		ObjectMeta: metav1.ObjectMeta{Name: "node1"},
 		Status: v1.NodeStatus{
@@ -148,15 +221,18 @@ func TestTopologyRequests(t *testing.T) {
 		},
 	}
 
-	node2Resources := v1.ResourceList{
-		v1.ResourceCPU:    *resource.NewQuantity(6, resource.DecimalSI),
-		v1.ResourceMemory: resource.MustParse("8Gi"),
-		v1.ResourcePods:   *resource.NewQuantity(20, resource.DecimalSI),
-		nicResourceName:   *resource.NewQuantity(7, resource.DecimalSI),
-	}
-	node2 := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node1"}, Status: v1.NodeStatus{
+	node2Resources := makeResourceListFromZones(nodes["node2"].Zones)
+	node2 := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node2"}, Status: v1.NodeStatus{
 		Capacity:    node2Resources,
 		Allocatable: node2Resources,
+	},
+	}
+
+	node3Resources := makeResourceListFromZones(nodes["node3"].Zones)
+
+	node3 := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node3"}, Status: v1.NodeStatus{
+		Capacity:    node3Resources,
+		Allocatable: node3Resources,
 	},
 	}
 
@@ -210,7 +286,7 @@ func TestTopologyRequests(t *testing.T) {
 			nodeTopologies: &nodes,
 			name:           "Burstable QoS, pod doesn't fit",
 			node:           node2,
-			wantStatus:     framework.NewStatus(framework.Unschedulable, fmt.Sprintf("Can't align container: %s", containerName)),
+			wantStatus:     framework.NewStatus(framework.Unschedulable, fmt.Sprintf("Cannot align container: %s", containerName)),
 		},
 		{
 			pod: makePodByResourceList(&v1.ResourceList{
@@ -220,7 +296,7 @@ func TestTopologyRequests(t *testing.T) {
 			nodeTopologies: &nodes,
 			name:           "Guaranteed QoS, pod doesn't fit",
 			node:           node1,
-			wantStatus:     framework.NewStatus(framework.Unschedulable, fmt.Sprintf("Can't align container: %s", containerName)),
+			wantStatus:     framework.NewStatus(framework.Unschedulable, fmt.Sprintf("Cannot align container: %s", containerName)),
 		},
 		{
 			pod: makePodByResourceList(&v1.ResourceList{
@@ -230,7 +306,27 @@ func TestTopologyRequests(t *testing.T) {
 			nodeTopologies: &nodes,
 			name:           "Guaranteed QoS, pod fit",
 			node:           node1,
-			wantStatus:     nil, //topology_match has to skip request of 0 resources
+			wantStatus:     nil,
+		},
+		{
+			pod: makePodByResourceListWithManyContainers(&v1.ResourceList{
+				v1.ResourceCPU:             *resource.NewQuantity(3, resource.DecimalSI),
+				v1.ResourceMemory:          resource.MustParse("1Gi"),
+				notExistingNICResourceName: *resource.NewQuantity(0, resource.DecimalSI)}, 3),
+			nodeTopologies: &nodes,
+			name:           "Guaranteed QoS Topology Scope, pod doesn't fit",
+			node:           node3,
+			wantStatus:     framework.NewStatus(framework.Unschedulable, "Cannot align pod: "),
+		},
+		{
+			pod: makePodByResourceListWithManyContainers(&v1.ResourceList{
+				v1.ResourceCPU:             *resource.NewQuantity(1, resource.DecimalSI),
+				v1.ResourceMemory:          resource.MustParse("1Gi"),
+				notExistingNICResourceName: *resource.NewQuantity(0, resource.DecimalSI)}, 3),
+			nodeTopologies: &nodes,
+			name:           "Guaranteed QoS Topology Scope, pod fit",
+			node:           node3,
+			wantStatus:     nil,
 		},
 	}
 
@@ -238,15 +334,17 @@ func TestTopologyRequests(t *testing.T) {
 	for _, test := range topologyTests {
 		t.Run(test.name, func(t *testing.T) {
 			tm := NodeResourceTopologyMatch{}
-			tm.nodeTopologies = nodes
+			tm.nodeTopologies = *test.nodeTopologies
 			tm.topologyPolicyHandlers = make(PolicyHandlerMap)
-			tm.topologyPolicyHandlers[apiconfig.SingleNUMANodeTopologyManagerPolicy] = tm
+			tm.topologyPolicyHandlers[apiconfig.SingleNUMANodeTopologyManagerPolicy] = SingleNUMANodeHandler{}
+			tm.topologyPolicyHandlers[apiconfig.PodTopologyScope] = PodLevelResourceHandler{}
 			nodeInfo.SetNode(&test.node)
 			test.pod.Spec.Containers[0].Name = containerName
-			test.pod.Spec.Containers[0].Resources.Limits = test.pod.Spec.Containers[0].Resources.Requests
 			gotStatus := tm.Filter(context.Background(), framework.NewCycleState(), test.pod, nodeInfo)
+
+			fmt.Printf("test.Name: %v; status: %v\n", test.name, gotStatus)
 			if !reflect.DeepEqual(gotStatus, test.wantStatus) {
-				t.Errorf("status does not match: %v, want: %v", gotStatus, test.wantStatus)
+				t.Errorf("status does not match: %v, want: %v\n", gotStatus, test.wantStatus)
 			}
 		})
 	}

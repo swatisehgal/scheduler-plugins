@@ -49,8 +49,14 @@ const (
 	// Most is the string "Most".
 	Most ModeType = "Most"
 
-	// to preserve consistency keep it in pkg/apis/core/types.go"
+	// Constants of type TopologyManagerPolicy represent policy of the worker
+	// node's resource management component. It's TopologyManager in kubele.
+	// SingleNUMANodeTopologyManagerPolicy represent single-numa-node policy of
+	// the TopologyManager
 	SingleNUMANodeTopologyManagerPolicy TopologyManagerPolicy = "SingleNUMANode"
+	// PodTopologyScope enables pod level resource counting, this policy assumes
+	// TopologyManager policy single-numa-node also was set on the node
+	PodTopologyScope TopologyManagerPolicy = "PodTopologyScope"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

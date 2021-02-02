@@ -20,8 +20,9 @@ Document capturing the NodeResourceTopology API Custom Resource Definition Stand
 In case the cumulative count of node resource allocatable appear to be the same for both the nodes in the cluster, topology aware scheduler plugin uses the CRD instance corresponding to the nodes to obtain the resource topology information to make a topology-aware scheduling decision.
 
 ### Config
- filter must be enabled for topology-aware scheduling.
-```
+
+ Enable the "NodeResourceTopologyMatch" Fitler plugin via SchedulerConfigConfiguration.
+```yaml
 apiVersion: kubescheduler.config.k8s.io/v1beta1
 kind: KubeSchedulerConfiguration
 leaderElection:

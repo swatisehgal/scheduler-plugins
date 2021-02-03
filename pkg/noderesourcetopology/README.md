@@ -56,10 +56,10 @@ The hardware topology corresponding to both the nodes is represented by the belo
 apiVersion: topology.node.k8s.io/v1alpha1
 kind: NodeResourceTopology
 metadata:
-  name: worker-node-a
+  name: worker-node-A
 topologyPolicies: ["SingleNUMANode"]
 zones:
-  - name: node-0
+  - name: numa-node-0
     type: Node
     resources:
       - name: cpu
@@ -71,7 +71,7 @@ zones:
       - name: example.com/deviceB
         capacity: 2
         allocatable: 2
-  - name: node-1
+  - name: numa-node-1
     type: Node
     resources:
       - name: cpu
@@ -90,10 +90,10 @@ zones:
 apiVersion: topology.node.k8s.io/v1alpha1
 kind: NodeResourceTopology
 metadata:
-  name: worker-node-b
+  name: worker-node-B
 topologyPolicies: ["SingleNUMANode"]
 zones:
-  - name: node-0
+  - name: numa-node-0
     type: Node
     resources:
       - name: cpu
@@ -102,7 +102,7 @@ zones:
       - name: example.com/deviceA
         capacity: 3
         allocatable: 3
-  - name: node-1
+  - name: numa-node-1
     type: Node
     resources:
       - name: cpu
@@ -135,11 +135,11 @@ zones:
              $ kubectl get noderesourcetopologies.topology.node.k8s.io
             ```
 
-         1. Deploy the CRs representative of the hardware topology of the worker node a and b:
+         1. Deploy the CRs representative of the hardware topology of the worker-node-A and worker-node-B:
 
             ```bash
-             $ kubectl create -f node-a-crd.yaml
-             $ kubectl create -f node-b-crd.yaml
+             $ kubectl create -f worker-node-A.yaml
+             $ kubectl create -f worker-node-B.yaml
             ```
 
 - Copy cluster kubeconfig file to /etc/kubernetes/scheduler.conf
@@ -224,14 +224,14 @@ spec:
   deployment.apps/test-deployment created
   ```
 
-- The test-deployment pod should be scheduled on the worker node a node
+- The test-deployment pod should be scheduled on the worker-node-A node
 
   ```script
   $ kubectl get pods -o wide
   NAME                               READY   STATUS    RESTARTS   AGE     IP           NODE                 NOMINATED NODE   READINESS GATES
-  device-plugin-a-ds-9bpsj           1/1     Running   0          3h13m   172.17.0.3   worker-node-b          <none>           <none>
-  device-plugin-a-ds-dv55t           1/1     Running   0          3h13m   172.17.0.2   worker-node-a          <none>           <none>
-  device-plugin-b-ds-8t7lh           1/1     Running   0          3h13m   172.17.0.2   worker-node-a          <none>           <none>
-  device-plugin-b-ds-lt4pr           1/1     Running   0          3h13m   172.17.0.3   worker-node-b          <none>           <none>
-  test-deployment-6dccf65ddb-pkg9j   1/1     Running   0          18s     172.17.0.2   worker-node-a          <none>           <none>
+  device-plugin-a-ds-9bpsj           1/1     Running   0          3h13m   172.17.0.3   worker-node-B          <none>           <none>
+  device-plugin-a-ds-dv55t           1/1     Running   0          3h13m   172.17.0.2   worker-node-A          <none>           <none>
+  device-plugin-b-ds-8t7lh           1/1     Running   0          3h13m   172.17.0.2   worker-node-A          <none>           <none>
+  device-plugin-b-ds-lt4pr           1/1     Running   0          3h13m   172.17.0.3   worker-node-B          <none>           <none>
+  test-deployment-6dccf65ddb-pkg9j   1/1     Running   0          18s     172.17.0.2   worker-node-A          <none>           <none>
   ```

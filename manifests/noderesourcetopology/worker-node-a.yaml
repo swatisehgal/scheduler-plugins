@@ -2,7 +2,7 @@
 apiVersion: topology.node.k8s.io/v1alpha1
 kind: NodeResourceTopology
 metadata:
-  name: kind-worker
+  name: worker-node-a
 topologyPolicies: ["SingleNUMANode"]
 zones:
   - name: node-0
@@ -12,14 +12,20 @@ zones:
         capacity: 4
         allocatable: 3
       - name: example.com/deviceA
-        capacity: 3
-        allocatable: 3
+        capacity: 1
+        allocatable: 1
+      - name: example.com/deviceB
+        capacity: 2
+        allocatable: 2
   - name: node-1
     type: Node
     resources:
       - name: cpu
         capacity: 4
         allocatable: 3
+      - name: example.com/deviceA
+        capacity: 2
+        allocatable: 2
       - name: example.com/deviceB
-        capacity: 3
-        allocatable: 3
+        capacity: 1
+        allocatable: 1

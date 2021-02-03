@@ -333,11 +333,11 @@ func TestTopologyRequests(t *testing.T) {
 	nodeInfo := framework.NewNodeInfo()
 	for _, test := range topologyTests {
 		t.Run(test.name, func(t *testing.T) {
-			tm := NodeResourceTopologyMatch{}
+			tm := TopologyMatch{}
 			tm.nodeTopologies = *test.nodeTopologies
-			tm.topologyPolicyHandlers = make(PolicyHandlerMap)
-			tm.topologyPolicyHandlers[apiconfig.SingleNUMANodeTopologyManagerPolicy] = SingleNUMANodeHandler{}
-			tm.topologyPolicyHandlers[apiconfig.PodTopologyScope] = PodLevelResourceHandler{}
+			tm.policyHandlers = make(PolicyHandlerMap)
+			tm.policyHandlers[apiconfig.SingleNUMANodeTopologyManagerPolicy] = SingleNUMANodeHandler{}
+			tm.policyHandlers[apiconfig.PodTopologyScope] = PodLevelResourceHandler{}
 			nodeInfo.SetNode(&test.node)
 			test.pod.Spec.Containers[0].Name = containerName
 			gotStatus := tm.Filter(context.Background(), framework.NewCycleState(), test.pod, nodeInfo)

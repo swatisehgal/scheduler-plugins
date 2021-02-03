@@ -43,7 +43,7 @@ const (
 	Name = "NodeResourceTopologyMatch"
 )
 
-var _ framework.FilterPlugin = &NodeResourceTopologyMatch{}
+var _ framework.FilterPlugin = &TopologyMatch{}
 
 type nodeTopologyMap map[string]topologyv1alpha1.NodeResourceTopology
 
@@ -53,8 +53,8 @@ type PolicyHandler interface {
 
 type PolicyHandlerMap map[apiconfig.TopologyManagerPolicy]PolicyHandler
 
-// NodeResourceTopologyMatch plugin which run simplified version of TopologyManager's admit handler
-type NodeResourceTopologyMatch struct {
+// TopologyMatch plugin which run simplified version of TopologyManager's admit handler
+type TopologyMatch struct {
 	nodeTopologies    nodeTopologyMap
 	nodeTopologyGuard sync.RWMutex
 	policyHandlers    PolicyHandlerMap
@@ -74,7 +74,7 @@ type NUMANode struct {
 type NUMANodeList []NUMANode
 
 // Name returns name of the plugin. It is used in logs, etc.
-func (tm *NodeResourceTopologyMatch) Name() string {
+func (tm *TopologyMatch) Name() string {
 	return Name
 }
 
@@ -196,7 +196,7 @@ func createNUMANodeList(zones topologyv1alpha1.ZoneList) NUMANodeList {
 }
 
 // Filter Now only single-numa-node supported
-func (tm *NodeResourceTopologyMatch) Filter(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
+func (tm *TopologyMatch) Filter(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
 	if nodeInfo.Node() == nil {
 		return framework.NewStatus(framework.Error, fmt.Sprintf("Node is nil %s", nodeInfo.Node().Name))
 	}
@@ -222,7 +222,7 @@ func (tm *NodeResourceTopologyMatch) Filter(ctx context.Context, cycleState *fra
 	return nil
 }
 
-func (tm *NodeResourceTopologyMatch) onTopologyFromDelete(obj interface{}) {
+func (tm *TopologyMatch) onTopologyFromDelete(obj interface{}) {
 	var nodeTopology *topologyv1alpha1.NodeResourceTopology
 	switch t := obj.(type) {
 	case *topologyv1alpha1.NodeResourceTopology:
@@ -249,7 +249,7 @@ func (tm *NodeResourceTopologyMatch) onTopologyFromDelete(obj interface{}) {
 	}
 }
 
-func (tm *NodeResourceTopologyMatch) onTopologyUpdate(oldObj interface{}, newObj interface{}) {
+func (tm *TopologyMatch) onTopologyUpdate(oldObj interface{}, newObj interface{}) {
 	var nodeTopology *topologyv1alpha1.NodeResourceTopology
 	switch t := newObj.(type) {
 	case *topologyv1alpha1.NodeResourceTopology:
@@ -273,7 +273,7 @@ func (tm *NodeResourceTopologyMatch) onTopologyUpdate(oldObj interface{}, newObj
 	tm.nodeTopologies[nodeTopology.Name] = *nodeTopology
 }
 
-func (tm *NodeResourceTopologyMatch) onTopologyAdd(obj interface{}) {
+func (tm *TopologyMatch) onTopologyAdd(obj interface{}) {
 	var nodeTopology *topologyv1alpha1.NodeResourceTopology
 	switch t := obj.(type) {
 	case *topologyv1alpha1.NodeResourceTopology:
@@ -299,13 +299,13 @@ func (tm *NodeResourceTopologyMatch) onTopologyAdd(obj interface{}) {
 
 // New initializes a new plugin and returns it.
 func New(args runtime.Object, handle framework.FrameworkHandle) (framework.Plugin, error) {
-	klog.V(5).Infof("creating new NodeResourceTopologyMatch plugin")
+	klog.V(5).Infof("creating new TopologyMatch plugin")
 	tcfg, ok := args.(*apiconfig.NodeResourceTopologyMatchArgs)
 	if !ok {
 		return nil, fmt.Errorf("want args to be of type NodeResourceTopologyMatchArgs, got %T", args)
 	}
 
-	topologyMatch := &NodeResourceTopologyMatch{
+	topologyMatch := &TopologyMatch{
 		policyHandlers: PolicyHandlerMap{
 			apiconfig.SingleNUMANodeTopologyManagerPolicy: SingleNUMANodeHandler{},
 			apiconfig.PodTopologyScope:                    PodLevelResourceHandler{},

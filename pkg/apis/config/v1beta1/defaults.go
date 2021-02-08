@@ -23,6 +23,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	schedulerconfig "k8s.io/kube-scheduler/config/v1"
 )
 
@@ -100,5 +101,9 @@ func SetDefaultTargetLoadPackingArgs(args *TargetLoadPackingArgs) {
 func SetDefaultsNodeResourceTopologyMatchArgs(obj *NodeResourceTopologyMatchArgs) {
 	if obj.KubeConfigPath == nil {
 		obj.KubeConfigPath = &defaultKubeConfigPath
+	}
+	if obj.Namespace == nil {
+		defaultNamespace := metav1.NamespaceDefault
+		obj.Namespace = &defaultNamespace
 	}
 }

@@ -185,6 +185,9 @@ func autoConvert_v1beta1_NodeResourceTopologyMatchArgs_To_config_NodeResourceTop
 	if err := v1.Convert_Pointer_string_To_string(&in.MasterOverride, &out.MasterOverride, s); err != nil {
 		return err
 	}
+	if err := v1.Convert_Pointer_string_To_string(&in.Namespace, &out.Namespace, s); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -214,6 +217,9 @@ func autoConvert_config_NodeResourceTopologyMatchArgs_To_v1beta1_NodeResourceTop
 		return err
 	}
 	if err := v1.Convert_string_To_Pointer_string(&in.MasterOverride, &out.MasterOverride, s); err != nil {
+		return err
+	}
+	if err := v1.Convert_string_To_Pointer_string(&in.Namespace, &out.Namespace, s); err != nil {
 		return err
 	}
 	return nil

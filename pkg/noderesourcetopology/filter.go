@@ -20,12 +20,10 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"sync"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog/v2"
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
@@ -36,6 +34,7 @@ import (
 	topologyv1alpha1 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha1"
 	topoclientset "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/generated/clientset/versioned"
 	topologyinformers "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/generated/informers/externalversions"
+	listerv1alpha1 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/generated/listers/topology/v1alpha1"
 )
 
 const (
@@ -47,23 +46,15 @@ var _ framework.FilterPlugin = &TopologyMatch{}
 
 type nodeTopologyMap map[string]topologyv1alpha1.NodeResourceTopology
 
-type PolicyHandler interface {
-	PolicyFilter(pod *v1.Pod, zoneMap topologyv1alpha1.ZoneList) *framework.Status
-}
+type PolicyHandler func(pod *v1.Pod, zoneMap topologyv1alpha1.ZoneList) *framework.Status
 
 type PolicyHandlerMap map[apiconfig.TopologyManagerPolicy]PolicyHandler
 
 // TopologyMatch plugin which run simplified version of TopologyManager's admit handler
 type TopologyMatch struct {
-	nodeTopologies    nodeTopologyMap
-	nodeTopologyGuard sync.RWMutex
-	policyHandlers    PolicyHandlerMap
-}
-
-type SingleNUMANodeHandler struct {
-}
-
-type PodLevelResourceHandler struct {
+	policyHandlers PolicyHandlerMap
+	lister         listerv1alpha1.NodeResourceTopologyLister
+	namespace      string
 }
 
 type NUMANode struct {
@@ -79,15 +70,12 @@ func (tm *TopologyMatch) Name() string {
 }
 
 // getTopologyPolicies return true if we're working with such policy
-func getTopologyPolicies(nodeTopologies nodeTopologyMap, nodeName string) []apiconfig.TopologyManagerPolicy {
-	if nodeTopology, ok := nodeTopologies[nodeName]; ok {
-		policies := make([]apiconfig.TopologyManagerPolicy, 0)
-		for _, policy := range nodeTopology.TopologyPolicies {
-			policies = append(policies, apiconfig.TopologyManagerPolicy(policy))
-		}
-		return policies
+func getTopologyPolicies(nodeTopology *topologyv1alpha1.NodeResourceTopology, nodeName string) []apiconfig.TopologyManagerPolicy {
+	policies := make([]apiconfig.TopologyManagerPolicy, 0)
+	for _, policy := range nodeTopology.TopologyPolicies {
+		policies = append(policies, apiconfig.TopologyManagerPolicy(policy))
 	}
-	return nil
+	return policies
 }
 
 func extractResources(zone topologyv1alpha1.Zone) v1.ResourceList {
@@ -103,7 +91,7 @@ func extractResources(zone topologyv1alpha1.Zone) v1.ResourceList {
 	return res
 }
 
-func (sh SingleNUMANodeHandler) PolicyFilter(pod *v1.Pod, zones topologyv1alpha1.ZoneList) *framework.Status {
+func SingleNUMAContainerLevelHandler(pod *v1.Pod, zones topologyv1alpha1.ZoneList) *framework.Status {
 	klog.V(5).Infof("Single NUMA node handler")
 	containers := []v1.Container{}
 	containers = append(pod.Spec.InitContainers, pod.Spec.Containers...)
@@ -153,7 +141,7 @@ func checkResourcesForNUMANodes(bitmask bm.BitMask, nodes NUMANodeList, resource
 	}
 }
 
-func (ph PodLevelResourceHandler) PolicyFilter(pod *v1.Pod, zones topologyv1alpha1.ZoneList) *framework.Status {
+func SingleNUMAPodLevelHandler(pod *v1.Pod, zones topologyv1alpha1.ZoneList) *framework.Status {
 	klog.V(5).Infof("Pod Level Resource handler")
 	containers := []v1.Container{}
 	containers = append(pod.Spec.InitContainers, pod.Spec.Containers...)
@@ -195,6 +183,15 @@ func createNUMANodeList(zones topologyv1alpha1.ZoneList) NUMANodeList {
 	return nodes
 }
 
+func getNodeTopology(nodes []*topologyv1alpha1.NodeResourceTopology, nodeName string) *topologyv1alpha1.NodeResourceTopology {
+	for _, node := range nodes {
+		if node.Name == nodeName {
+			return node
+		}
+	}
+	return nil
+}
+
 // Filter Now only single-numa-node supported
 func (tm *TopologyMatch) Filter(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
 	if nodeInfo.Node() == nil {
@@ -205,14 +202,18 @@ func (tm *TopologyMatch) Filter(ctx context.Context, cycleState *framework.Cycle
 	}
 
 	nodeName := nodeInfo.Node().Name
+	nodeTopology, err := tm.lister.NodeResourceTopologies(tm.namespace).Get(nodeName)
 
-	topologyPolicies := getTopologyPolicies(tm.nodeTopologies, nodeName)
+	if err != nil {
+		klog.Errorf("Cannot get NodeTopologies from cache: %v", err)
+		return nil
+	}
+
+	klog.V(5).Infof("nodeTopology: %v", nodeTopology)
+	topologyPolicies := getTopologyPolicies(nodeTopology, nodeName)
 	for _, policyName := range topologyPolicies {
 		if handler, ok := tm.policyHandlers[policyName]; ok {
-			tm.nodeTopologyGuard.RLock()
-			zones := tm.nodeTopologies[nodeName].Zones
-			tm.nodeTopologyGuard.RUnlock()
-			if status := handler.PolicyFilter(pod, zones); status != nil {
+			if status := handler(pod, nodeTopology.Zones); status != nil {
 				return status
 			}
 		} else {
@@ -222,95 +223,12 @@ func (tm *TopologyMatch) Filter(ctx context.Context, cycleState *framework.Cycle
 	return nil
 }
 
-func (tm *TopologyMatch) onTopologyFromDelete(obj interface{}) {
-	var nodeTopology *topologyv1alpha1.NodeResourceTopology
-	switch t := obj.(type) {
-	case *topologyv1alpha1.NodeResourceTopology:
-		nodeTopology = t
-	case cache.DeletedFinalStateUnknown:
-		var ok bool
-		nodeTopology, ok = t.Obj.(*topologyv1alpha1.NodeResourceTopology)
-		if !ok {
-			klog.Errorf("cannot convert to *v1alpha1.NodeResourceTopology: %v", t.Obj)
-			return
-		}
-	default:
-		klog.Errorf("cannot convert to *v1alpha1.NodeResourceTopology: %v", t)
-		return
-	}
-
-	klog.V(5).Infof("delete event for scheduled NodeResourceTopology %s/%s ",
-		nodeTopology.Namespace, nodeTopology.Name)
-
-	tm.nodeTopologyGuard.Lock()
-	defer tm.nodeTopologyGuard.Unlock()
-	if _, ok := tm.nodeTopologies[nodeTopology.Name]; ok {
-		delete(tm.nodeTopologies, nodeTopology.Name)
-	}
-}
-
-func (tm *TopologyMatch) onTopologyUpdate(oldObj interface{}, newObj interface{}) {
-	var nodeTopology *topologyv1alpha1.NodeResourceTopology
-	switch t := newObj.(type) {
-	case *topologyv1alpha1.NodeResourceTopology:
-		nodeTopology = t
-	case cache.DeletedFinalStateUnknown:
-		var ok bool
-		nodeTopology, ok = t.Obj.(*topologyv1alpha1.NodeResourceTopology)
-		if !ok {
-			klog.Errorf("cannot convert to *v1alpha1.NodeResourceTopology: %v", t.Obj)
-			return
-		}
-	default:
-		klog.Errorf("cannot convert to *v1alpha1.NodeResourceTopology: %v", t)
-		return
-	}
-	klog.V(5).Infof("update event for scheduled NodeResourceTopology %s/%s ",
-		nodeTopology.Namespace, nodeTopology.Name)
-
-	tm.nodeTopologyGuard.Lock()
-	defer tm.nodeTopologyGuard.Unlock()
-	tm.nodeTopologies[nodeTopology.Name] = *nodeTopology
-}
-
-func (tm *TopologyMatch) onTopologyAdd(obj interface{}) {
-	var nodeTopology *topologyv1alpha1.NodeResourceTopology
-	switch t := obj.(type) {
-	case *topologyv1alpha1.NodeResourceTopology:
-		nodeTopology = t
-	case cache.DeletedFinalStateUnknown:
-		var ok bool
-		nodeTopology, ok = t.Obj.(*topologyv1alpha1.NodeResourceTopology)
-		if !ok {
-			klog.Errorf("cannot convert to *v1alpha1.NodeResourceTopology: %v", t.Obj)
-			return
-		}
-	default:
-		klog.Errorf("cannot convert to *v1alpha1.NodeResourceTopology: %v", t)
-		return
-	}
-	klog.V(5).Infof("add event for scheduled NodeResourceTopology %s/%s ",
-		nodeTopology.Namespace, nodeTopology.Name)
-
-	tm.nodeTopologyGuard.Lock()
-	defer tm.nodeTopologyGuard.Unlock()
-	tm.nodeTopologies[nodeTopology.Name] = *nodeTopology
-}
-
 // New initializes a new plugin and returns it.
 func New(args runtime.Object, handle framework.FrameworkHandle) (framework.Plugin, error) {
 	klog.V(5).Infof("creating new TopologyMatch plugin")
 	tcfg, ok := args.(*apiconfig.NodeResourceTopologyMatchArgs)
 	if !ok {
 		return nil, fmt.Errorf("want args to be of type NodeResourceTopologyMatchArgs, got %T", args)
-	}
-
-	topologyMatch := &TopologyMatch{
-		policyHandlers: PolicyHandlerMap{
-			apiconfig.SingleNUMANodeTopologyManagerPolicy: SingleNUMANodeHandler{},
-			apiconfig.PodTopologyScope:                    PodLevelResourceHandler{},
-		},
-		nodeTopologies: nodeTopologyMap{},
 	}
 
 	kubeConfig, err := clientcmd.BuildConfigFromFlags(tcfg.MasterOverride, tcfg.KubeConfigPath)
@@ -327,22 +245,19 @@ func New(args runtime.Object, handle framework.FrameworkHandle) (framework.Plugi
 
 	topologyInformerFactory := topologyinformers.NewSharedInformerFactory(topoClient, 0)
 	nodeTopologyInformer := topologyInformerFactory.Topology().V1alpha1().NodeResourceTopologies()
-
-	nodeTopologyInformer.Informer().AddEventHandler(
-		cache.ResourceEventHandlerFuncs{
-			AddFunc:    topologyMatch.onTopologyAdd,
-			UpdateFunc: topologyMatch.onTopologyUpdate,
-			DeleteFunc: topologyMatch.onTopologyFromDelete,
+	topologyMatch := &TopologyMatch{
+		policyHandlers: PolicyHandlerMap{
+			apiconfig.SingleNUMANodePodLevel:       SingleNUMAPodLevelHandler,
+			apiconfig.SingleNUMANodeContainerLevel: SingleNUMAContainerLevelHandler,
 		},
-	)
+		lister:    nodeTopologyInformer.Lister(),
+		namespace: tcfg.Namespace,
+	}
 
-	ctx := context.Background()
-	go nodeTopologyInformer.Informer().Run(ctx.Done())
 	klog.V(5).Infof("start nodeTopologyInformer")
+	ctx := context.Background()
 	topologyInformerFactory.Start(ctx.Done())
 	topologyInformerFactory.WaitForCacheSync(ctx.Done())
-
-	klog.V(5).Infof("WaitForCacheSync synchronyous")
 
 	return topologyMatch, nil
 }

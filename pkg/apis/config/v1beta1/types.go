@@ -121,4 +121,5 @@ type NodeResourceTopologyMatchArgs struct {
 
 	KubeConfigPath *string `json:"kubeconfigpath,omitempty"`
 	MasterOverride *string `json:"masteroverride,omitempty"`
+	Namespace      *string `json:"namespace,omitempty"`
 }

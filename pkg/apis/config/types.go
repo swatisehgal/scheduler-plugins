@@ -51,12 +51,12 @@ const (
 
 	// Constants of type TopologyManagerPolicy represent policy of the worker
 	// node's resource management component. It's TopologyManager in kubele.
-	// SingleNUMANodeTopologyManagerPolicy represent single-numa-node policy of
+	// SingleNUMANodeContainerLevel represent single-numa-node policy of
 	// the TopologyManager
-	SingleNUMANodeTopologyManagerPolicy TopologyManagerPolicy = "SingleNUMANode"
-	// PodTopologyScope enables pod level resource counting, this policy assumes
+	SingleNUMANodeContainerLevel TopologyManagerPolicy = "SingleNUMANodeContainerLevel"
+	// SingleNUMANodePodLevel enables pod level resource counting, this policy assumes
 	// TopologyManager policy single-numa-node also was set on the node
-	PodTopologyScope TopologyManagerPolicy = "PodTopologyScope"
+	SingleNUMANodePodLevel TopologyManagerPolicy = "SingleNUMANodePodLevel"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -131,4 +131,5 @@ type NodeResourceTopologyMatchArgs struct {
 
 	KubeConfigPath string
 	MasterOverride string
+	Namespace      string
 }

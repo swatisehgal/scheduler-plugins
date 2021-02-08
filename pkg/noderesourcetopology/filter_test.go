@@ -23,10 +23,12 @@ import (
 	"testing"
 
 	topologyv1alpha1 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha1"
+	listerv1alpha1 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/generated/listers/topology/v1alpha1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	intstr "k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 
@@ -45,6 +47,36 @@ func makePodByResourceList(resources *v1.ResourceList) *v1.Pod {
 		},
 	}},
 	}}
+}
+
+// no no mock only indexer
+type mockIndexer struct {
+	nodeTopologies nodeTopologyMap
+}
+
+func (m mockIndexer) ByIndex(indexName, indexKey string) ([]interface{}, error)      { return nil, nil }
+func (m mockIndexer) AddIndexers(cache.Indexers) error                               { return nil }
+func (m mockIndexer) GetIndexers() cache.Indexers                                    { return nil }
+func (m mockIndexer) ListIndexFuncValues(indexName string) []string                  { return nil }
+func (m mockIndexer) Index(indexName string, obj interface{}) ([]interface{}, error) { return nil, nil }
+func (m mockIndexer) IndexKeys(indexName, indexedValue string) ([]string, error)     { return nil, nil }
+
+func (m mockIndexer) Add(interface{}) error               { return nil }
+func (m mockIndexer) Update(obj interface{}) error        { return nil }
+func (m mockIndexer) Delete(obj interface{}) error        { return nil }
+func (m mockIndexer) List() []interface{}                 { return nil }
+func (m mockIndexer) ListKeys() []string                  { return nil }
+func (m mockIndexer) Replace([]interface{}, string) error { return nil }
+func (m mockIndexer) Resync() error                       { return nil }
+func (m mockIndexer) Get(obj interface{}) (item interface{}, exists bool, err error) {
+	return nil, false, nil
+}
+
+func (m mockIndexer) GetByKey(key string) (item interface{}, exists bool, err error) {
+	if v, ok := m.nodeTopologies[key]; ok {
+		return &v, ok, nil
+	}
+	return nil, false, fmt.Errorf("Node topology is not found: %v", key)
 }
 
 func makeResourceListFromZones(zones topologyv1alpha1.ZoneList) v1.ResourceList {
@@ -81,9 +113,9 @@ func makePodByResourceListWithManyContainers(resources *v1.ResourceList, contain
 
 func TestTopologyRequests(t *testing.T) {
 	nodes := nodeTopologyMap{}
-	nodes["node1"] = topologyv1alpha1.NodeResourceTopology{
+	nodes["default/node1"] = topologyv1alpha1.NodeResourceTopology{
 		ObjectMeta:       metav1.ObjectMeta{Name: "node1"},
-		TopologyPolicies: []string{string(apiconfig.SingleNUMANodeTopologyManagerPolicy)},
+		TopologyPolicies: []string{string(apiconfig.SingleNUMANodeContainerLevel)},
 		Zones: topologyv1alpha1.ZoneList{
 			topologyv1alpha1.Zone{
 				Name: "node-0",
@@ -125,9 +157,9 @@ func TestTopologyRequests(t *testing.T) {
 		},
 	}
 
-	nodes["node2"] = topologyv1alpha1.NodeResourceTopology{
+	nodes["default/node2"] = topologyv1alpha1.NodeResourceTopology{
 		ObjectMeta:       metav1.ObjectMeta{Name: "node2"},
-		TopologyPolicies: []string{string(apiconfig.SingleNUMANodeTopologyManagerPolicy)},
+		TopologyPolicies: []string{string(apiconfig.SingleNUMANodeContainerLevel)},
 		Zones: topologyv1alpha1.ZoneList{
 			topologyv1alpha1.Zone{
 				Name: "node-0",
@@ -169,9 +201,9 @@ func TestTopologyRequests(t *testing.T) {
 		},
 	}
 
-	nodes["node3"] = topologyv1alpha1.NodeResourceTopology{
+	nodes["default/node3"] = topologyv1alpha1.NodeResourceTopology{
 		ObjectMeta:       metav1.ObjectMeta{Name: "node3"},
-		TopologyPolicies: []string{string(apiconfig.PodTopologyScope)},
+		TopologyPolicies: []string{string(apiconfig.SingleNUMANodePodLevel)},
 		Zones: topologyv1alpha1.ZoneList{
 			topologyv1alpha1.Zone{
 				Name: "node-0",
@@ -212,7 +244,7 @@ func TestTopologyRequests(t *testing.T) {
 			},
 		},
 	}
-	node1Resources := makeResourceListFromZones(nodes["node1"].Zones)
+	node1Resources := makeResourceListFromZones(nodes["default/node1"].Zones)
 	node1 := v1.Node{
 		ObjectMeta: metav1.ObjectMeta{Name: "node1"},
 		Status: v1.NodeStatus{
@@ -221,7 +253,7 @@ func TestTopologyRequests(t *testing.T) {
 		},
 	}
 
-	node2Resources := makeResourceListFromZones(nodes["node2"].Zones)
+	node2Resources := makeResourceListFromZones(nodes["default/node2"].Zones)
 	node2 := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node2"}, Status: v1.NodeStatus{
 		Capacity:    node2Resources,
 		Allocatable: node2Resources,
@@ -239,14 +271,14 @@ func TestTopologyRequests(t *testing.T) {
 	// Test different QoS Guaranteed/Burstable/BestEffort
 	topologyTests := []struct {
 		pod            *v1.Pod
-		nodeTopologies *nodeTopologyMap
+		nodeTopologies nodeTopologyMap
 		name           string
 		node           v1.Node
 		wantStatus     *framework.Status
 	}{
 		{
 			pod:            &v1.Pod{Spec: v1.PodSpec{Containers: []v1.Container{{}}}},
-			nodeTopologies: &nodes,
+			nodeTopologies: nodes,
 			name:           "Best effort QoS, pod fit",
 			node:           node1,
 			wantStatus:     nil,
@@ -256,7 +288,7 @@ func TestTopologyRequests(t *testing.T) {
 				v1.ResourceCPU:    *resource.NewQuantity(2, resource.DecimalSI),
 				v1.ResourceMemory: resource.MustParse("2Gi"),
 				nicResourceName:   *resource.NewQuantity(3, resource.DecimalSI)}),
-			nodeTopologies: &nodes,
+			nodeTopologies: nodes,
 			name:           "Guaranteed QoS, pod fit",
 			node:           node2,
 			wantStatus:     nil,
@@ -265,7 +297,7 @@ func TestTopologyRequests(t *testing.T) {
 			pod: makePodByResourceList(&v1.ResourceList{
 				v1.ResourceCPU:  *resource.NewQuantity(4, resource.DecimalSI),
 				nicResourceName: *resource.NewQuantity(3, resource.DecimalSI)}),
-			nodeTopologies: &nodes,
+			nodeTopologies: nodes,
 			name:           "Burstable QoS, pod fit",
 			node:           node2,
 			wantStatus:     nil,
@@ -274,7 +306,7 @@ func TestTopologyRequests(t *testing.T) {
 			pod: makePodByResourceList(&v1.ResourceList{
 				v1.ResourceCPU:  *resource.NewQuantity(14, resource.DecimalSI),
 				nicResourceName: *resource.NewQuantity(3, resource.DecimalSI)}),
-			nodeTopologies: &nodes,
+			nodeTopologies: nodes,
 			name:           "Burstable QoS, pod doesn't fit",
 			node:           node2,
 			wantStatus:     nil, // number of cpu is exceeded, but in case of burstable QoS for cpu resources we rely on fit.go
@@ -283,7 +315,7 @@ func TestTopologyRequests(t *testing.T) {
 			pod: makePodByResourceList(&v1.ResourceList{
 				v1.ResourceCPU:  *resource.NewQuantity(4, resource.DecimalSI),
 				nicResourceName: *resource.NewQuantity(11, resource.DecimalSI)}),
-			nodeTopologies: &nodes,
+			nodeTopologies: nodes,
 			name:           "Burstable QoS, pod doesn't fit",
 			node:           node2,
 			wantStatus:     framework.NewStatus(framework.Unschedulable, fmt.Sprintf("Cannot align container: %s", containerName)),
@@ -293,7 +325,7 @@ func TestTopologyRequests(t *testing.T) {
 				v1.ResourceCPU:    *resource.NewQuantity(9, resource.DecimalSI),
 				v1.ResourceMemory: resource.MustParse("1Gi"),
 				nicResourceName:   *resource.NewQuantity(3, resource.DecimalSI)}),
-			nodeTopologies: &nodes,
+			nodeTopologies: nodes,
 			name:           "Guaranteed QoS, pod doesn't fit",
 			node:           node1,
 			wantStatus:     framework.NewStatus(framework.Unschedulable, fmt.Sprintf("Cannot align container: %s", containerName)),
@@ -303,7 +335,7 @@ func TestTopologyRequests(t *testing.T) {
 				v1.ResourceCPU:             *resource.NewQuantity(2, resource.DecimalSI),
 				v1.ResourceMemory:          resource.MustParse("1Gi"),
 				notExistingNICResourceName: *resource.NewQuantity(0, resource.DecimalSI)}),
-			nodeTopologies: &nodes,
+			nodeTopologies: nodes,
 			name:           "Guaranteed QoS, pod fit",
 			node:           node1,
 			wantStatus:     nil,
@@ -313,7 +345,7 @@ func TestTopologyRequests(t *testing.T) {
 				v1.ResourceCPU:             *resource.NewQuantity(3, resource.DecimalSI),
 				v1.ResourceMemory:          resource.MustParse("1Gi"),
 				notExistingNICResourceName: *resource.NewQuantity(0, resource.DecimalSI)}, 3),
-			nodeTopologies: &nodes,
+			nodeTopologies: nodes,
 			name:           "Guaranteed QoS Topology Scope, pod doesn't fit",
 			node:           node3,
 			wantStatus:     framework.NewStatus(framework.Unschedulable, "Cannot align pod: "),
@@ -323,7 +355,7 @@ func TestTopologyRequests(t *testing.T) {
 				v1.ResourceCPU:             *resource.NewQuantity(1, resource.DecimalSI),
 				v1.ResourceMemory:          resource.MustParse("1Gi"),
 				notExistingNICResourceName: *resource.NewQuantity(0, resource.DecimalSI)}, 3),
-			nodeTopologies: &nodes,
+			nodeTopologies: nodes,
 			name:           "Guaranteed QoS Topology Scope, pod fit",
 			node:           node3,
 			wantStatus:     nil,
@@ -333,11 +365,14 @@ func TestTopologyRequests(t *testing.T) {
 	nodeInfo := framework.NewNodeInfo()
 	for _, test := range topologyTests {
 		t.Run(test.name, func(t *testing.T) {
-			tm := TopologyMatch{}
-			tm.nodeTopologies = *test.nodeTopologies
-			tm.policyHandlers = make(PolicyHandlerMap)
-			tm.policyHandlers[apiconfig.SingleNUMANodeTopologyManagerPolicy] = SingleNUMANodeHandler{}
-			tm.policyHandlers[apiconfig.PodTopologyScope] = PodLevelResourceHandler{}
+			tm := TopologyMatch{
+				policyHandlers: PolicyHandlerMap{
+					apiconfig.SingleNUMANodePodLevel:       SingleNUMAPodLevelHandler,
+					apiconfig.SingleNUMANodeContainerLevel: SingleNUMAContainerLevelHandler,
+				},
+				namespace: metav1.NamespaceDefault,
+				lister:    listerv1alpha1.NewNodeResourceTopologyLister(mockIndexer{nodeTopologies: test.nodeTopologies}),
+			}
 			nodeInfo.SetNode(&test.node)
 			test.pod.Spec.Containers[0].Name = containerName
 			gotStatus := tm.Filter(context.Background(), framework.NewCycleState(), test.pod, nodeInfo)

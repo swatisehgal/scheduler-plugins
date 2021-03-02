@@ -41,22 +41,11 @@ type CoschedulingArgs struct {
 // ModeType is a "string" type.
 type ModeType string
 
-type TopologyManagerPolicy string
-
 const (
 	// Least is the string "Least".
 	Least ModeType = "Least"
 	// Most is the string "Most".
 	Most ModeType = "Most"
-
-	// Constants of type TopologyManagerPolicy represent policy of the worker
-	// node's resource management component. It's TopologyManager in kubele.
-	// SingleNUMANodeContainerLevel represent single-numa-node policy of
-	// the TopologyManager
-	SingleNUMANodeContainerLevel TopologyManagerPolicy = "SingleNUMANodeContainerLevel"
-	// SingleNUMANodePodLevel enables pod level resource counting, this policy assumes
-	// TopologyManager policy single-numa-node also was set on the node
-	SingleNUMANodePodLevel TopologyManagerPolicy = "SingleNUMANodePodLevel"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -131,5 +120,5 @@ type NodeResourceTopologyMatchArgs struct {
 
 	KubeConfigPath string
 	MasterOverride string
-	Namespace      string
+	Namespaces     []string
 }

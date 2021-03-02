@@ -48,13 +48,13 @@ type nodeTopologyMap map[string]topologyv1alpha1.NodeResourceTopology
 
 type PolicyHandler func(pod *v1.Pod, zoneMap topologyv1alpha1.ZoneList) *framework.Status
 
-type PolicyHandlerMap map[apiconfig.TopologyManagerPolicy]PolicyHandler
+type PolicyHandlerMap map[topologyv1alpha1.TopologyManagerPolicy]PolicyHandler
 
 // TopologyMatch plugin which run simplified version of TopologyManager's admit handler
 type TopologyMatch struct {
 	policyHandlers PolicyHandlerMap
 	lister         listerv1alpha1.NodeResourceTopologyLister
-	namespace      string
+	namespaces     []string
 }
 
 type NUMANode struct {
@@ -70,10 +70,10 @@ func (tm *TopologyMatch) Name() string {
 }
 
 // getTopologyPolicies return true if we're working with such policy
-func getTopologyPolicies(nodeTopology *topologyv1alpha1.NodeResourceTopology, nodeName string) []apiconfig.TopologyManagerPolicy {
-	policies := make([]apiconfig.TopologyManagerPolicy, 0)
+func getTopologyPolicies(nodeTopology *topologyv1alpha1.NodeResourceTopology, nodeName string) []topologyv1alpha1.TopologyManagerPolicy {
+	policies := make([]topologyv1alpha1.TopologyManagerPolicy, 0)
 	for _, policy := range nodeTopology.TopologyPolicies {
-		policies = append(policies, apiconfig.TopologyManagerPolicy(policy))
+		policies = append(policies, topologyv1alpha1.TopologyManagerPolicy(policy))
 	}
 	return policies
 }
@@ -93,26 +93,24 @@ func extractResources(zone topologyv1alpha1.Zone) v1.ResourceList {
 
 func SingleNUMAContainerLevelHandler(pod *v1.Pod, zones topologyv1alpha1.ZoneList) *framework.Status {
 	klog.V(5).Infof("Single NUMA node handler")
-	containers := []v1.Container{}
-	containers = append(pod.Spec.InitContainers, pod.Spec.Containers...)
 
 	// prepare NUMANodes list from zoneMap
 	nodes := createNUMANodeList(zones)
 	qos := v1qos.GetPodQOS(pod)
-	for _, container := range containers {
-		bitmask := bm.NewEmptyBitMask()
-		bitmask.Fill()
-
-		checkResourcesForNUMANodes(bitmask, nodes, container.Resources.Requests, qos)
-		if bitmask.IsEmpty() {
-			// definitly we can't align container, so we can't align a pod
+	for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
+		resBitmask := checkResourcesForNUMANodes(nodes, container.Resources.Requests, qos)
+		if resBitmask.IsEmpty() {
+			// definitely we can't align container, so we can't align a pod
 			return framework.NewStatus(framework.Unschedulable, fmt.Sprintf("Cannot align container: %s", container.Name))
 		}
 	}
 	return nil
 }
 
-func checkResourcesForNUMANodes(bitmask bm.BitMask, nodes NUMANodeList, resources v1.ResourceList, qos v1.PodQOSClass) {
+func checkResourcesForNUMANodes(nodes NUMANodeList, resources v1.ResourceList, qos v1.PodQOSClass) bm.BitMask {
+	bitmask := bm.NewEmptyBitMask()
+	bitmask.Fill()
+
 	zeroQuantity := resource.MustParse("0")
 	for resource, quantity := range resources {
 		resourceBitmask := bm.NewEmptyBitMask()
@@ -139,31 +137,27 @@ func checkResourcesForNUMANodes(bitmask bm.BitMask, nodes NUMANodeList, resource
 		}
 		bitmask.And(resourceBitmask)
 	}
+	return bitmask
 }
 
 func SingleNUMAPodLevelHandler(pod *v1.Pod, zones topologyv1alpha1.ZoneList) *framework.Status {
 	klog.V(5).Infof("Pod Level Resource handler")
-	containers := []v1.Container{}
-	containers = append(pod.Spec.InitContainers, pod.Spec.Containers...)
-
 	resources := make(v1.ResourceList)
 
-	for _, container := range containers {
+	for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
 		for resource, quantity := range container.Resources.Requests {
-			if quan, ok := resources[resource]; ok {
-				quantity.Add(quan)
+			if q, ok := resources[resource]; ok {
+				quantity.Add(q)
 			}
 			resources[resource] = quantity
 		}
 	}
 
 	nodes := createNUMANodeList(zones)
-	bitmask := bm.NewEmptyBitMask()
-	bitmask.Fill()
-	checkResourcesForNUMANodes(bitmask, nodes, resources, v1qos.GetPodQOS(pod))
+	resBitmask := checkResourcesForNUMANodes(nodes, resources, v1qos.GetPodQOS(pod))
 
-	if bitmask.IsEmpty() {
-		// definitly we can't align container, so we can't align a pod
+	if resBitmask.IsEmpty() {
+		// definitely we can't align container, so we can't align a pod
 		return framework.NewStatus(framework.Unschedulable, fmt.Sprintf("Cannot align pod: %s", pod.Name))
 	}
 	return nil
@@ -192,6 +186,22 @@ func getNodeTopology(nodes []*topologyv1alpha1.NodeResourceTopology, nodeName st
 	return nil
 }
 
+func (tm *TopologyMatch) findNodeTopology(nodeName string) *topologyv1alpha1.NodeResourceTopology {
+	klog.V(5).Infof("tm.namespaces: %s", tm.namespaces)
+	for _, namespace := range tm.namespaces {
+		// NodeTopology couldn't be placed in several namespaces simultaneously
+		nodeTopology, err := tm.lister.NodeResourceTopologies(namespace).Get(nodeName)
+		if err != nil {
+			klog.Errorf("Cannot get NodeTopologies from cache: %v", err)
+			return nil
+		}
+		if nodeTopology != nil {
+			return nodeTopology
+		}
+	}
+	return nil
+}
+
 // Filter Now only single-numa-node supported
 func (tm *TopologyMatch) Filter(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
 	if nodeInfo.Node() == nil {
@@ -202,10 +212,9 @@ func (tm *TopologyMatch) Filter(ctx context.Context, cycleState *framework.Cycle
 	}
 
 	nodeName := nodeInfo.Node().Name
-	nodeTopology, err := tm.lister.NodeResourceTopologies(tm.namespace).Get(nodeName)
+	nodeTopology := tm.findNodeTopology(nodeName)
 
-	if err != nil {
-		klog.Errorf("Cannot get NodeTopologies from cache: %v", err)
+	if nodeTopology == nil {
 		return nil
 	}
 
@@ -247,11 +256,11 @@ func New(args runtime.Object, handle framework.FrameworkHandle) (framework.Plugi
 	nodeTopologyInformer := topologyInformerFactory.Topology().V1alpha1().NodeResourceTopologies()
 	topologyMatch := &TopologyMatch{
 		policyHandlers: PolicyHandlerMap{
-			apiconfig.SingleNUMANodePodLevel:       SingleNUMAPodLevelHandler,
-			apiconfig.SingleNUMANodeContainerLevel: SingleNUMAContainerLevelHandler,
+			topologyv1alpha1.SingleNUMANodePodLevel:       SingleNUMAPodLevelHandler,
+			topologyv1alpha1.SingleNUMANodeContainerLevel: SingleNUMAContainerLevelHandler,
 		},
-		lister:    nodeTopologyInformer.Lister(),
-		namespace: tcfg.Namespace,
+		lister:     nodeTopologyInformer.Lister(),
+		namespaces: tcfg.Namespaces,
 	}
 
 	klog.V(5).Infof("start nodeTopologyInformer")

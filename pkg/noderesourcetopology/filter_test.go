@@ -31,8 +31,6 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
-
-	apiconfig "sigs.k8s.io/scheduler-plugins/pkg/apis/config"
 )
 
 const nicResourceName = "vendor/nic1"
@@ -115,7 +113,7 @@ func TestTopologyRequests(t *testing.T) {
 	nodes := nodeTopologyMap{}
 	nodes["default/node1"] = topologyv1alpha1.NodeResourceTopology{
 		ObjectMeta:       metav1.ObjectMeta{Name: "node1"},
-		TopologyPolicies: []string{string(apiconfig.SingleNUMANodeContainerLevel)},
+		TopologyPolicies: []string{string(topologyv1alpha1.SingleNUMANodeContainerLevel)},
 		Zones: topologyv1alpha1.ZoneList{
 			topologyv1alpha1.Zone{
 				Name: "node-0",
@@ -159,7 +157,7 @@ func TestTopologyRequests(t *testing.T) {
 
 	nodes["default/node2"] = topologyv1alpha1.NodeResourceTopology{
 		ObjectMeta:       metav1.ObjectMeta{Name: "node2"},
-		TopologyPolicies: []string{string(apiconfig.SingleNUMANodeContainerLevel)},
+		TopologyPolicies: []string{string(topologyv1alpha1.SingleNUMANodeContainerLevel)},
 		Zones: topologyv1alpha1.ZoneList{
 			topologyv1alpha1.Zone{
 				Name: "node-0",
@@ -203,7 +201,7 @@ func TestTopologyRequests(t *testing.T) {
 
 	nodes["default/node3"] = topologyv1alpha1.NodeResourceTopology{
 		ObjectMeta:       metav1.ObjectMeta{Name: "node3"},
-		TopologyPolicies: []string{string(apiconfig.SingleNUMANodePodLevel)},
+		TopologyPolicies: []string{string(topologyv1alpha1.SingleNUMANodePodLevel)},
 		Zones: topologyv1alpha1.ZoneList{
 			topologyv1alpha1.Zone{
 				Name: "node-0",
@@ -367,11 +365,11 @@ func TestTopologyRequests(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			tm := TopologyMatch{
 				policyHandlers: PolicyHandlerMap{
-					apiconfig.SingleNUMANodePodLevel:       SingleNUMAPodLevelHandler,
-					apiconfig.SingleNUMANodeContainerLevel: SingleNUMAContainerLevelHandler,
+					topologyv1alpha1.SingleNUMANodePodLevel:       SingleNUMAPodLevelHandler,
+					topologyv1alpha1.SingleNUMANodeContainerLevel: SingleNUMAContainerLevelHandler,
 				},
-				namespace: metav1.NamespaceDefault,
-				lister:    listerv1alpha1.NewNodeResourceTopologyLister(mockIndexer{nodeTopologies: test.nodeTopologies}),
+				namespaces: []string{metav1.NamespaceDefault},
+				lister:     listerv1alpha1.NewNodeResourceTopologyLister(mockIndexer{nodeTopologies: test.nodeTopologies}),
 			}
 			nodeInfo.SetNode(&test.node)
 			test.pod.Spec.Containers[0].Name = containerName

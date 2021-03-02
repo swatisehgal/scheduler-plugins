@@ -46,8 +46,8 @@ func main() {
 		app.WithPlugin(capacityscheduling.Name, capacityscheduling.New),
 		app.WithPlugin(coscheduling.Name, coscheduling.New),
 		app.WithPlugin(noderesources.AllocatableName, noderesources.NewAllocatable),
-		app.WithPlugin(targetloadpacking.Name, targetloadpacking.New),
 		app.WithPlugin(noderesourcetopology.Name, noderesourcetopology.New),
+		app.WithPlugin(targetloadpacking.Name, targetloadpacking.New),
 		// Sample plugins below.
 		app.WithPlugin(crossnodepreemption.Name, crossnodepreemption.New),
 		app.WithPlugin(podstate.Name, podstate.New),

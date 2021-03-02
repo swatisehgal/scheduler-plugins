@@ -131,10 +131,10 @@ func (in *NodeResourceTopologyMatchArgs) DeepCopyInto(out *NodeResourceTopologyM
 		*out = new(string)
 		**out = **in
 	}
-	if in.Namespace != nil {
-		in, out := &in.Namespace, &out.Namespace
-		*out = new(string)
-		**out = **in
+	if in.Namespaces != nil {
+		in, out := &in.Namespaces, &out.Namespaces
+		*out = make([]string, len(*in))
+		copy(*out, *in)
 	}
 	return
 }

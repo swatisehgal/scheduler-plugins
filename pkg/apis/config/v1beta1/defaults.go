@@ -102,8 +102,7 @@ func SetDefaultsNodeResourceTopologyMatchArgs(obj *NodeResourceTopologyMatchArgs
 	if obj.KubeConfigPath == nil {
 		obj.KubeConfigPath = &defaultKubeConfigPath
 	}
-	if obj.Namespace == nil {
-		defaultNamespace := metav1.NamespaceDefault
-		obj.Namespace = &defaultNamespace
+	if len(obj.Namespaces) == 0 {
+		obj.Namespaces = []string{metav1.NamespaceDefault}
 	}
 }

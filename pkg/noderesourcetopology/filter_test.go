@@ -47,6 +47,8 @@ func makePodByResourceList(resources *v1.ResourceList) *v1.Pod {
 	}}
 }
 
+type nodeTopologyMap map[string]topologyv1alpha1.NodeResourceTopology
+
 // no no mock only indexer
 type mockIndexer struct {
 	nodeTopologies nodeTopologyMap

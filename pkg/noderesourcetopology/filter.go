@@ -44,8 +44,6 @@ const (
 
 var _ framework.FilterPlugin = &TopologyMatch{}
 
-type nodeTopologyMap map[string]topologyv1alpha1.NodeResourceTopology
-
 type PolicyHandler func(pod *v1.Pod, zoneMap topologyv1alpha1.ZoneList) *framework.Status
 
 type PolicyHandlerMap map[topologyv1alpha1.TopologyManagerPolicy]PolicyHandler
@@ -67,15 +65,6 @@ type NUMANodeList []NUMANode
 // Name returns name of the plugin. It is used in logs, etc.
 func (tm *TopologyMatch) Name() string {
 	return Name
-}
-
-// getTopologyPolicies return true if we're working with such policy
-func getTopologyPolicies(nodeTopology *topologyv1alpha1.NodeResourceTopology, nodeName string) []topologyv1alpha1.TopologyManagerPolicy {
-	policies := make([]topologyv1alpha1.TopologyManagerPolicy, 0)
-	for _, policy := range nodeTopology.TopologyPolicies {
-		policies = append(policies, topologyv1alpha1.TopologyManagerPolicy(policy))
-	}
-	return policies
 }
 
 func extractResources(zone topologyv1alpha1.Zone) v1.ResourceList {
@@ -161,7 +150,6 @@ func SingleNUMAPodLevelHandler(pod *v1.Pod, zones topologyv1alpha1.ZoneList) *fr
 		return framework.NewStatus(framework.Unschedulable, fmt.Sprintf("Cannot align pod: %s", pod.Name))
 	}
 	return nil
-
 }
 
 func createNUMANodeList(zones topologyv1alpha1.ZoneList) NUMANodeList {
@@ -169,21 +157,16 @@ func createNUMANodeList(zones topologyv1alpha1.ZoneList) NUMANodeList {
 	for _, zone := range zones {
 		if zone.Type == "Node" {
 			var numaID int
-			fmt.Sscanf(zone.Name, "node-%d", &numaID)
+			_, err := fmt.Sscanf(zone.Name, "node-%d", &numaID)
+			if err != nil {
+				klog.Errorf("Invalid format: %v", zone.Name)
+				continue
+			}
 			resources := extractResources(zone)
 			nodes = append(nodes, NUMANode{NUMAID: numaID, Resources: resources})
 		}
 	}
 	return nodes
-}
-
-func getNodeTopology(nodes []*topologyv1alpha1.NodeResourceTopology, nodeName string) *topologyv1alpha1.NodeResourceTopology {
-	for _, node := range nodes {
-		if node.Name == nodeName {
-			return node
-		}
-	}
-	return nil
 }
 
 func (tm *TopologyMatch) findNodeTopology(nodeName string) *topologyv1alpha1.NodeResourceTopology {
@@ -192,7 +175,7 @@ func (tm *TopologyMatch) findNodeTopology(nodeName string) *topologyv1alpha1.Nod
 		// NodeTopology couldn't be placed in several namespaces simultaneously
 		nodeTopology, err := tm.lister.NodeResourceTopologies(namespace).Get(nodeName)
 		if err != nil {
-			klog.Errorf("Cannot get NodeTopologies from cache: %v", err)
+			klog.Errorf("Cannot get NodeTopologies from NodeResourceTopologyNamespaceLister: %v", err)
 			return nil
 		}
 		if nodeTopology != nil {
@@ -219,9 +202,8 @@ func (tm *TopologyMatch) Filter(ctx context.Context, cycleState *framework.Cycle
 	}
 
 	klog.V(5).Infof("nodeTopology: %v", nodeTopology)
-	topologyPolicies := getTopologyPolicies(nodeTopology, nodeName)
-	for _, policyName := range topologyPolicies {
-		if handler, ok := tm.policyHandlers[policyName]; ok {
+	for _, policyName := range nodeTopology.TopologyPolicies {
+		if handler, ok := tm.policyHandlers[topologyv1alpha1.TopologyManagerPolicy(policyName)]; ok {
 			if status := handler(pod, nodeTopology.Zones); status != nil {
 				return status
 			}

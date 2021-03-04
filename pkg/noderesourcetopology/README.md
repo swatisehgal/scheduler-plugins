@@ -62,7 +62,7 @@ kind: NodeResourceTopology
 metadata:
   name: worker-node-A
   namespace: test-namespace
-topologyPolicies: ["SingleNUMANode"]
+topologyPolicies: ["SingleNUMANodeContainerLevel"]
 zones:
   - name: numa-node-0
     type: Node
@@ -96,7 +96,8 @@ apiVersion: topology.node.k8s.io/v1alpha1
 kind: NodeResourceTopology
 metadata:
   name: worker-node-B
-topologyPolicies: ["SingleNUMANode"]
+  namespace: test-namespace
+topologyPolicies: ["SingleNUMANodeContainerLevel"]
 zones:
   - name: numa-node-0
     type: Node
@@ -143,6 +144,7 @@ zones:
          1. Deploy the CRs representative of the hardware topology of the worker-node-A and worker-node-B:
 
             ```bash
+             $ kubectl create -f ns.yaml
              $ kubectl create -f worker-node-A.yaml
              $ kubectl create -f worker-node-B.yaml
             ```

@@ -4,7 +4,7 @@ kind: NodeResourceTopology
 metadata:
   name: worker-node-a
   namespace: test-namespace
-topologyPolicies: ["SingleNUMANode"]
+topologyPolicies: ["SingleNUMANodeContainerLevel"]
 zones:
   - name: node-0
     type: Node

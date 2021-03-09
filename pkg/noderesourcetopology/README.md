@@ -44,6 +44,7 @@ profiles:
       namespaces:
         - default
         - production
+        - test-namespace
 ```
 
 ### Demo
@@ -148,6 +149,7 @@ zones:
              $ kubectl create -f worker-node-A.yaml
              $ kubectl create -f worker-node-B.yaml
             ```
+            NOTE: In case you are testing this demo by creating CRs manually, ensure that the names of the nodes in the cluster match the CR names.
 
 - Copy cluster kubeconfig file to /etc/kubernetes/scheduler.conf
 

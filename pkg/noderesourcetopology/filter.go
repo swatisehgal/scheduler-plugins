@@ -114,10 +114,10 @@ func checkResourcesForNUMANodes(nodes NUMANodeList, resources v1.ResourceList, q
 			// 1. set numa node as possible node if resource is memory or Hugepages (until memory manager will not be merged and
 			// memory will not be provided in CRD
 			// 2. set numa node as possible node if resource is cpu and it's not guaranteed QoS, since cpu will flow
-			// 3. set numa node as possible node if zero quantity for non existing resource was requested (TODO check topology manaager behaviour)
+			// 3. set numa node as possible node if zero quantity for non existing resource was requested (TODO check topology manager behaviour)
 			// 4. otherwise check amount of resources
 			if resource == v1.ResourceMemory ||
-				strings.HasPrefix(string(resource), string(v1.ResourceHugePagesPrefix)) ||
+				strings.HasPrefix(string(resource), v1.ResourceHugePagesPrefix) ||
 				resource == v1.ResourceCPU && qos != v1.PodQOSGuaranteed ||
 				quantity.Cmp(zeroQuantity) == 0 ||
 				numaQuantity.Cmp(quantity) >= 0 {
@@ -175,8 +175,8 @@ func (tm *TopologyMatch) findNodeTopology(nodeName string) *topologyv1alpha1.Nod
 		// NodeTopology couldn't be placed in several namespaces simultaneously
 		nodeTopology, err := tm.lister.NodeResourceTopologies(namespace).Get(nodeName)
 		if err != nil {
-			klog.Errorf("Cannot get NodeTopologies from NodeResourceTopologyNamespaceLister: %v", err)
-			return nil
+			klog.V(5).Infof("Cannot get NodeTopologies from NodeResourceTopologyNamespaceLister: %v", err)
+			continue
 		}
 		if nodeTopology != nil {
 			return nodeTopology

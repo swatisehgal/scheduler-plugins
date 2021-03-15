@@ -86,6 +86,9 @@ func SingleNUMAContainerLevelHandler(pod *v1.Pod, zones topologyv1alpha1.ZoneLis
 	// prepare NUMANodes list from zoneMap
 	nodes := createNUMANodeList(zones)
 	qos := v1qos.GetPodQOS(pod)
+
+	// We count here in the way TopologyManager is doing it, IOW we put InitContainers
+	// and normal containers in the one scope
 	for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
 		resBitmask := checkResourcesForNUMANodes(nodes, container.Resources.Requests, qos)
 		if resBitmask.IsEmpty() {
@@ -96,6 +99,8 @@ func SingleNUMAContainerLevelHandler(pod *v1.Pod, zones topologyv1alpha1.ZoneLis
 	return nil
 }
 
+// checkResourcesForNUMANodes checks for sufficient resource, this function
+// requires NUMANodeList with properly populated NUMANode, NUMAID should be in range 0-63
 func checkResourcesForNUMANodes(nodes NUMANodeList, resources v1.ResourceList, qos v1.PodQOSClass) bm.BitMask {
 	bitmask := bm.NewEmptyBitMask()
 	bitmask.Fill()
@@ -111,10 +116,9 @@ func checkResourcesForNUMANodes(nodes NUMANodeList, resources v1.ResourceList, q
 				continue
 			}
 			// Check for the following:
-			// 1. set numa node as possible node if resource is memory or Hugepages (until memory manager will not be merged and
-			// memory will not be provided in CRD
+			// 1. set numa node as possible node if resource is memory or Hugepages
 			// 2. set numa node as possible node if resource is cpu and it's not guaranteed QoS, since cpu will flow
-			// 3. set numa node as possible node if zero quantity for non existing resource was requested (TODO check topology manager behaviour)
+			// 3. set numa node as possible node if zero quantity for non existing resource was requested
 			// 4. otherwise check amount of resources
 			if resource == v1.ResourceMemory ||
 				strings.HasPrefix(string(resource), v1.ResourceHugePagesPrefix) ||
@@ -133,6 +137,8 @@ func SingleNUMAPodLevelHandler(pod *v1.Pod, zones topologyv1alpha1.ZoneList) *fr
 	klog.V(5).Infof("Pod Level Resource handler")
 	resources := make(v1.ResourceList)
 
+	// We count here in the way TopologyManager is doing it, IOW we put InitContainers
+	// and normal containers in the one scope
 	for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
 		for resource, quantity := range container.Resources.Requests {
 			if q, ok := resources[resource]; ok {
@@ -160,6 +166,10 @@ func createNUMANodeList(zones topologyv1alpha1.ZoneList) NUMANodeList {
 			_, err := fmt.Sscanf(zone.Name, "node-%d", &numaID)
 			if err != nil {
 				klog.Errorf("Invalid format: %v", zone.Name)
+				continue
+			}
+			if numaID > 63 || numaID < 0 {
+				klog.Errorf("Invalid NUMA id range: %v", numaID)
 				continue
 			}
 			resources := extractResources(zone)

@@ -49,6 +49,14 @@ func makePodByResourceList(resources *v1.ResourceList) *v1.Pod {
 
 type nodeTopologyMap map[string]topologyv1alpha1.NodeResourceTopology
 
+type topologyMatchTests []struct {
+	pod            *v1.Pod
+	nodeTopologies nodeTopologyMap
+	name           string
+	node           v1.Node
+	wantStatus     *framework.Status
+}
+
 // no no mock only indexer
 type mockIndexer struct {
 	nodeTopologies nodeTopologyMap
@@ -111,7 +119,30 @@ func makePodByResourceListWithManyContainers(resources *v1.ResourceList, contain
 	return &v1.Pod{Spec: v1.PodSpec{Containers: containers}}
 }
 
-func TestTopologyRequests(t *testing.T) {
+func runTests(t *testing.T, topologyTests topologyMatchTests) {
+	nodeInfo := framework.NewNodeInfo()
+	for _, test := range topologyTests {
+		t.Run(test.name, func(t *testing.T) {
+			tm := TopologyMatch{
+				policyHandlers: PolicyHandlerMap{
+					topologyv1alpha1.SingleNUMANodePodLevel:       SingleNUMAPodLevelHandler,
+					topologyv1alpha1.SingleNUMANodeContainerLevel: SingleNUMAContainerLevelHandler,
+				},
+				namespaces: []string{metav1.NamespaceDefault},
+				lister:     listerv1alpha1.NewNodeResourceTopologyLister(mockIndexer{nodeTopologies: test.nodeTopologies}),
+			}
+			nodeInfo.SetNode(&test.node)
+			test.pod.Spec.Containers[0].Name = containerName
+			gotStatus := tm.Filter(context.Background(), framework.NewCycleState(), test.pod, nodeInfo)
+
+			if !reflect.DeepEqual(gotStatus, test.wantStatus) {
+				t.Errorf("status does not match: %v, want: %v\n", gotStatus, test.wantStatus)
+			}
+		})
+	}
+}
+
+func TestTopologyRequestsCorrectNodeResourceTopology(t *testing.T) {
 	nodes := nodeTopologyMap{}
 	nodes["default/node1"] = topologyv1alpha1.NodeResourceTopology{
 		ObjectMeta:       metav1.ObjectMeta{Name: "node1"},
@@ -260,7 +291,7 @@ func TestTopologyRequests(t *testing.T) {
 	},
 	}
 
-	node3Resources := makeResourceListFromZones(nodes["node3"].Zones)
+	node3Resources := makeResourceListFromZones(nodes["default/node3"].Zones)
 
 	node3 := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node3"}, Status: v1.NodeStatus{
 		Capacity:    node3Resources,
@@ -269,13 +300,7 @@ func TestTopologyRequests(t *testing.T) {
 	}
 
 	// Test different QoS Guaranteed/Burstable/BestEffort
-	topologyTests := []struct {
-		pod            *v1.Pod
-		nodeTopologies nodeTopologyMap
-		name           string
-		node           v1.Node
-		wantStatus     *framework.Status
-	}{
+	topologyTests := topologyMatchTests{
 		{
 			pod:            &v1.Pod{Spec: v1.PodSpec{Containers: []v1.Container{{}}}},
 			nodeTopologies: nodes,
@@ -362,25 +387,75 @@ func TestTopologyRequests(t *testing.T) {
 		},
 	}
 
-	nodeInfo := framework.NewNodeInfo()
-	for _, test := range topologyTests {
-		t.Run(test.name, func(t *testing.T) {
-			tm := TopologyMatch{
-				policyHandlers: PolicyHandlerMap{
-					topologyv1alpha1.SingleNUMANodePodLevel:       SingleNUMAPodLevelHandler,
-					topologyv1alpha1.SingleNUMANodeContainerLevel: SingleNUMAContainerLevelHandler,
-				},
-				namespaces: []string{metav1.NamespaceDefault},
-				lister:     listerv1alpha1.NewNodeResourceTopologyLister(mockIndexer{nodeTopologies: test.nodeTopologies}),
-			}
-			nodeInfo.SetNode(&test.node)
-			test.pod.Spec.Containers[0].Name = containerName
-			gotStatus := tm.Filter(context.Background(), framework.NewCycleState(), test.pod, nodeInfo)
+	runTests(t, topologyTests)
+}
 
-			fmt.Printf("test.Name: %v; status: %v\n", test.name, gotStatus)
-			if !reflect.DeepEqual(gotStatus, test.wantStatus) {
-				t.Errorf("status does not match: %v, want: %v\n", gotStatus, test.wantStatus)
-			}
-		})
+func TestTopologyRequestsIncorrectNodeResourceTopology(t *testing.T) {
+	nodes := nodeTopologyMap{}
+	nodes["default/badly_formed_node"] = topologyv1alpha1.NodeResourceTopology{
+		ObjectMeta:       metav1.ObjectMeta{Name: "badly_formed_node"},
+		TopologyPolicies: []string{string(topologyv1alpha1.SingleNUMANodePodLevel)},
+		Zones: topologyv1alpha1.ZoneList{
+			topologyv1alpha1.Zone{
+				Name: "node-0",
+				Type: "Node",
+				Resources: topologyv1alpha1.ResourceInfoList{
+					topologyv1alpha1.ResourceInfo{
+						Name:        "cpu",
+						Capacity:    intstr.Parse("20"),
+						Allocatable: intstr.Parse("2"),
+					}, topologyv1alpha1.ResourceInfo{
+						Name:        "memory",
+						Capacity:    intstr.Parse("8Gi"),
+						Allocatable: intstr.Parse("4Gi"),
+					}, topologyv1alpha1.ResourceInfo{
+						Name:        nicResourceName,
+						Capacity:    intstr.Parse("30"),
+						Allocatable: intstr.Parse("5"),
+					},
+				},
+			}, topologyv1alpha1.Zone{
+				Name: "node-75",
+				Type: "Node",
+				Resources: topologyv1alpha1.ResourceInfoList{
+					topologyv1alpha1.ResourceInfo{
+						Name:        "cpu",
+						Capacity:    intstr.Parse("30"),
+						Allocatable: intstr.Parse("4"),
+					}, topologyv1alpha1.ResourceInfo{
+						Name:        "memory",
+						Capacity:    intstr.Parse("8Gi"),
+						Allocatable: intstr.Parse("4Gi"),
+					}, topologyv1alpha1.ResourceInfo{
+						Name:        nicResourceName,
+						Capacity:    intstr.Parse("30"),
+						Allocatable: intstr.Parse("2"),
+					},
+				},
+			},
+		},
 	}
+
+	nodeResources := makeResourceListFromZones(nodes["default/badly_formed_node"].Zones)
+
+	badNode := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "badly_formed_node"}, Status: v1.NodeStatus{
+		Capacity:    nodeResources,
+		Allocatable: nodeResources,
+	},
+	}
+
+	// Test different QoS Guaranteed/Burstable/BestEffort
+	topologyTests := topologyMatchTests{
+		{
+			pod: makePodByResourceListWithManyContainers(&v1.ResourceList{
+				v1.ResourceCPU:             *resource.NewQuantity(1, resource.DecimalSI),
+				v1.ResourceMemory:          resource.MustParse("1Gi"),
+				notExistingNICResourceName: *resource.NewQuantity(0, resource.DecimalSI)}, 3),
+			nodeTopologies: nodes,
+			name:           "Guaranteed QoS Topology Scope, invalid node",
+			node:           badNode,
+			wantStatus:     framework.NewStatus(framework.Unschedulable, "Cannot align pod: "),
+		},
+	}
+	runTests(t, topologyTests)
 }

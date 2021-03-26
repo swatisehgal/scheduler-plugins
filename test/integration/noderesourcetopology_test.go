@@ -18,6 +18,7 @@ package integration
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"testing"
@@ -81,7 +82,6 @@ func TestTopologyMatchPlugin(t *testing.T) {
 	}
 
 	cs := kubernetes.NewForConfigOrDie(config)
-	// extClient := clientset.NewForConfigOrDie(config)
 
 	topologyClient, err := topologyclientset.NewForConfig(config)
 	if err != nil {
@@ -133,6 +133,9 @@ func TestTopologyMatchPlugin(t *testing.T) {
 				Enabled: []schedapi.Plugin{
 					{Name: noderesourcetopology.Name},
 				},
+				Disabled: []schedapi.Plugin{
+					{Name: "*"},
+				},
 			},
 		},
 		PluginConfig: []schedapi.PluginConfig{
@@ -157,28 +160,37 @@ func TestTopologyMatchPlugin(t *testing.T) {
 	nodeName1 := "fake-node-1"
 	node1 := st.MakeNode().Name("fake-node-1").Label("node", nodeName1).Obj()
 	node1.Status.Allocatable = v1.ResourceList{
-		v1.ResourceCPU: *resource.NewQuantity(4, resource.DecimalSI),
+		v1.ResourceCPU:  *resource.NewQuantity(4, resource.DecimalSI),
+		v1.ResourcePods: *resource.NewQuantity(32, resource.DecimalSI),
 	}
 	node1.Status.Capacity = v1.ResourceList{
-		v1.ResourceCPU: *resource.NewQuantity(4, resource.DecimalSI),
+		v1.ResourceCPU:  *resource.NewQuantity(4, resource.DecimalSI),
+		v1.ResourcePods: *resource.NewQuantity(32, resource.DecimalSI),
 	}
-	_, err = cs.CoreV1().Nodes().Create(ctx, node1, metav1.CreateOptions{})
+	n1, err := cs.CoreV1().Nodes().Create(ctx, node1, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Failed to create Node %q: %v", nodeName1, err)
 	}
+
+	t.Logf(" Node 1 created: %v", n1)
 	// Create another Node.
 	nodeName2 := "fake-node-2"
 	node2 := st.MakeNode().Name("fake-node-2").Label("node", nodeName2).Obj()
 	node2.Status.Allocatable = v1.ResourceList{
-		v1.ResourceCPU: *resource.NewQuantity(4, resource.DecimalSI),
+		v1.ResourceCPU:  *resource.NewQuantity(4, resource.DecimalSI),
+		v1.ResourcePods: *resource.NewQuantity(32, resource.DecimalSI),
 	}
 	node2.Status.Capacity = v1.ResourceList{
-		v1.ResourceCPU: *resource.NewQuantity(4, resource.DecimalSI),
+		v1.ResourceCPU:  *resource.NewQuantity(4, resource.DecimalSI),
+		v1.ResourcePods: *resource.NewQuantity(32, resource.DecimalSI),
 	}
-	_, err = cs.CoreV1().Nodes().Create(ctx, node2, metav1.CreateOptions{})
+	n2, err := cs.CoreV1().Nodes().Create(ctx, node2, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Failed to create Node %q: %v", nodeName2, err)
 	}
+	t.Logf(" Node 2 created: %v", n2)
+	nodeList, err := cs.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
+	t.Logf(" NodeList: %v", nodeList)
 	pause := imageutils.GetPauseImageName()
 	for _, tt := range []struct {
 		name                   string
@@ -274,12 +286,19 @@ func TestTopologyMatchPlugin(t *testing.T) {
 			for i, p := range tt.pods {
 
 				// Wait for the pod to be scheduled.
-				err = wait.Poll(1*time.Second, 10*time.Second, func() (bool, error) {
+				err = wait.Poll(1*time.Second, 20*time.Second, func() (bool, error) {
 					return podScheduled(cs, ns.Name, p.Name), nil
 				})
 				if err != nil {
-					t.Fatalf("Waiting for pod %q to be scheduled, error: %v", tt.pods[i].Name, err.Error())
+					t.Errorf("pod %q to be scheduled, error: %v", tt.pods[i].Name, err)
 				}
+
+				t.Logf(" p scheduled: %v", p)
+				podList, err := cs.CoreV1().Pods(ns.Name).List(ctx, metav1.ListOptions{})
+				if err != nil {
+					t.Logf("Error listing pods %v", err)
+				}
+				t.Logf(" podList: %v", podList)
 
 				// The other pods should be scheduled on the small nodes.
 				if p.Spec.NodeName == tt.expectedNode {
@@ -384,6 +403,15 @@ func createNodeResourceTopologies(ctx context.Context, topologyClient *topologyc
 		_, err := topologyClient.TopologyV1alpha1().NodeResourceTopologies(nrt.Namespace).Create(ctx, nrt, metav1.CreateOptions{})
 		if err != nil && !errors.IsAlreadyExists(err) {
 			return err
+		}
+		crdInstance, err := topologyClient.TopologyV1alpha1().NodeResourceTopologies(nrt.Namespace).Get(ctx, nrt.Name, metav1.GetOptions{})
+		if err != nil {
+			klog.Infof(" Error in createNodeResourceTopologies not able to Get the CRD instance %s %v", nrt.Name, err)
+		}
+		crdInstJson, err := json.Marshal(crdInstance)
+		klog.Infof(string(crdInstJson))
+		if err != nil {
+			klog.Infof(" Error in createNodeResourceTopologies marshalling crdInstJson %v", err)
 		}
 	}
 	return nil

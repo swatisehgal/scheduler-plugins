@@ -130,6 +130,11 @@ func TestTopologyMatchPlugin(t *testing.T) {
 	profile := schedapi.KubeSchedulerProfile{
 		SchedulerName: v1.DefaultSchedulerName,
 		Plugins: &schedapi.Plugins{
+			PreBind: &schedapi.PluginSet{
+				Disabled: []schedapi.Plugin{
+					{Name: "*"},
+				},
+			},
 			Filter: &schedapi.PluginSet{
 				Enabled: []schedapi.Plugin{
 					{Name: noderesourcetopology.Name},
@@ -216,7 +221,7 @@ func TestTopologyMatchPlugin(t *testing.T) {
 		{
 			name: "Filtering out nodes that cannot fit resources on a single numa node in case of Guranteed pod",
 			pods: []*v1.Pod{
-				withContainer(st.MakePod().Namespace(ns.Name).Name("topology-aware-scheduler-pod").Req(map[v1.ResourceName]string{v1.ResourceCPU: "4", v1.ResourceMemory: "50"}).Obj(), pause, withResList("4", "50"), withResList("4", "50")),
+				withContainer(st.MakePod().Namespace(ns.Name).Name("topology-aware-scheduler-pod").Req(map[v1.ResourceName]string{v1.ResourceCPU: "4", v1.ResourceMemory: "5Gi"}).Obj(), pause, withResList("4", "50Gi"), withResList("4", "50Gi")),
 			},
 			nodeResourceTopologies: []*topologyv1alpha1.NodeResourceTopology{
 				{
@@ -232,6 +237,11 @@ func TestTopologyMatchPlugin(t *testing.T) {
 									Allocatable: intstr.FromString("2"),
 									Capacity:    intstr.FromString("2"),
 								},
+								topologyv1alpha1.ResourceInfo{
+									Name:        string(v1.ResourceMemory),
+									Allocatable: intstr.Parse("8Gi"),
+									Capacity:    intstr.Parse("8Gi"),
+								},
 							},
 						},
 						topologyv1alpha1.Zone{
@@ -242,6 +252,11 @@ func TestTopologyMatchPlugin(t *testing.T) {
 									Name:        "cpu",
 									Allocatable: intstr.FromString("2"),
 									Capacity:    intstr.FromString("2"),
+								},
+								topologyv1alpha1.ResourceInfo{
+									Name:        string(v1.ResourceMemory),
+									Allocatable: intstr.Parse("8Gi"),
+									Capacity:    intstr.Parse("8Gi"),
 								},
 							},
 						},
@@ -260,6 +275,11 @@ func TestTopologyMatchPlugin(t *testing.T) {
 									Allocatable: intstr.FromString("4"),
 									Capacity:    intstr.FromString("4"),
 								},
+								topologyv1alpha1.ResourceInfo{
+									Name:        string(v1.ResourceMemory),
+									Allocatable: intstr.Parse("8Gi"),
+									Capacity:    intstr.Parse("8Gi"),
+								},
 							},
 						},
 						topologyv1alpha1.Zone{
@@ -270,6 +290,11 @@ func TestTopologyMatchPlugin(t *testing.T) {
 									Name:        "cpu",
 									Allocatable: intstr.FromString("0"),
 									Capacity:    intstr.FromString("0"),
+								},
+								topologyv1alpha1.ResourceInfo{
+									Name:        string(v1.ResourceMemory),
+									Allocatable: intstr.Parse("8Gi"),
+									Capacity:    intstr.Parse("8Gi"),
 								},
 							},
 						},

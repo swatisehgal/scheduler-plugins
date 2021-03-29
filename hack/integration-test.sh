@@ -48,7 +48,8 @@ runTests() {
   kube::log::status "Running integration test cases"
 
   # TODO: make args customizable.
-  go test -mod=vendor sigs.k8s.io/scheduler-plugins/test/integration/...
+  #go test -mod=vendor sigs.k8s.io/scheduler-plugins/test/integration/...
+  GOFLAGS="-v" go test test/integration/noderesourcetopology_test.go test/integration/base.go -v
 
   cleanup
 }

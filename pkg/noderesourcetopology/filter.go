@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"strings"
 
+	"encoding/json"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -82,10 +84,16 @@ func extractResources(zone topologyv1alpha1.Zone) v1.ResourceList {
 
 func SingleNUMAContainerLevelHandler(pod *v1.Pod, zones topologyv1alpha1.ZoneList) *framework.Status {
 	klog.V(5).Infof("Single NUMA node handler")
+	fmt.Println("Single NUMA node handler")
 
 	// prepare NUMANodes list from zoneMap
 	nodes := createNUMANodeList(zones)
 	qos := v1qos.GetPodQOS(pod)
+
+	fmt.Printf("qos: %v\n", qos)
+
+	podJson, _ := json.Marshal(pod)
+	fmt.Printf("podJson: %s\n", string(podJson))
 
 	// We count here in the way TopologyManager is doing it, IOW we put InitContainers
 	// and normal containers in the one scope
@@ -93,6 +101,7 @@ func SingleNUMAContainerLevelHandler(pod *v1.Pod, zones topologyv1alpha1.ZoneLis
 		resBitmask := checkResourcesForNUMANodes(nodes, container.Resources.Requests, qos)
 		if resBitmask.IsEmpty() {
 			// definitely we can't align container, so we can't align a pod
+			fmt.Printf("Cannot align container: %s", container.Name)
 			return framework.NewStatus(framework.Unschedulable, fmt.Sprintf("Cannot align container: %s", container.Name))
 		}
 	}
@@ -135,6 +144,8 @@ func checkResourcesForNUMANodes(nodes NUMANodeList, resources v1.ResourceList, q
 
 func SingleNUMAPodLevelHandler(pod *v1.Pod, zones topologyv1alpha1.ZoneList) *framework.Status {
 	klog.V(5).Infof("Pod Level Resource handler")
+
+	fmt.Println("Pod Level Resource handler")
 	resources := make(v1.ResourceList)
 
 	// We count here in the way TopologyManager is doing it, IOW we put InitContainers
@@ -197,6 +208,7 @@ func (tm *TopologyMatch) findNodeTopology(nodeName string) *topologyv1alpha1.Nod
 
 // Filter Now only single-numa-node supported
 func (tm *TopologyMatch) Filter(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
+	fmt.Println("--------------------------FILTER---------------------------")
 	if nodeInfo.Node() == nil {
 		return framework.NewStatus(framework.Error, fmt.Sprintf("Node is nil %s", nodeInfo.Node().Name))
 	}
@@ -212,8 +224,13 @@ func (tm *TopologyMatch) Filter(ctx context.Context, cycleState *framework.Cycle
 	}
 
 	klog.V(5).Infof("nodeTopology: %v", nodeTopology)
+
+	node, _ := json.Marshal(nodeTopology)
+
+	fmt.Println("nodeTopology: %s", string(node))
 	for _, policyName := range nodeTopology.TopologyPolicies {
 		if handler, ok := tm.policyHandlers[topologyv1alpha1.TopologyManagerPolicy(policyName)]; ok {
+			fmt.Println("call")
 			if status := handler(pod, nodeTopology.Zones); status != nil {
 				return status
 			}
@@ -226,6 +243,7 @@ func (tm *TopologyMatch) Filter(ctx context.Context, cycleState *framework.Cycle
 
 // New initializes a new plugin and returns it.
 func New(args runtime.Object, handle framework.FrameworkHandle) (framework.Plugin, error) {
+	fmt.Println("--------------------------NEW---------------------------")
 	klog.V(5).Infof("creating new TopologyMatch plugin")
 	tcfg, ok := args.(*apiconfig.NodeResourceTopologyMatchArgs)
 	if !ok {
@@ -260,5 +278,6 @@ func New(args runtime.Object, handle framework.FrameworkHandle) (framework.Plugi
 	topologyInformerFactory.Start(ctx.Done())
 	topologyInformerFactory.WaitForCacheSync(ctx.Done())
 
+	fmt.Println("--------------------------NEWTOPO---------------------------")
 	return topologyMatch, nil
 }

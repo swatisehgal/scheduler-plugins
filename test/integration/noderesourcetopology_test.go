@@ -37,6 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
+	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/scheduler"
 	schedapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
@@ -137,6 +138,16 @@ func TestTopologyMatchPlugin(t *testing.T) {
 					{Name: "*"},
 				},
 			},
+			PreFilter: &schedapi.PluginSet{
+				Disabled: []schedapi.Plugin{
+					{Name: "*"},
+				},
+			},
+			Reserve: &schedapi.PluginSet{
+				Disabled: []schedapi.Plugin{
+					{Name: "*"},
+				},
+			},
 		},
 		PluginConfig: []schedapi.PluginConfig{
 			{
@@ -160,12 +171,14 @@ func TestTopologyMatchPlugin(t *testing.T) {
 	nodeName1 := "fake-node-1"
 	node1 := st.MakeNode().Name("fake-node-1").Label("node", nodeName1).Obj()
 	node1.Status.Allocatable = v1.ResourceList{
-		v1.ResourceCPU:  *resource.NewQuantity(4, resource.DecimalSI),
-		v1.ResourcePods: *resource.NewQuantity(32, resource.DecimalSI),
+		v1.ResourceCPU:    *resource.NewQuantity(4, resource.DecimalSI),
+		v1.ResourceMemory: *resource.NewQuantity(100, resource.DecimalSI),
+		v1.ResourcePods:   *resource.NewQuantity(32, resource.DecimalSI),
 	}
 	node1.Status.Capacity = v1.ResourceList{
-		v1.ResourceCPU:  *resource.NewQuantity(4, resource.DecimalSI),
-		v1.ResourcePods: *resource.NewQuantity(32, resource.DecimalSI),
+		v1.ResourceCPU:    *resource.NewQuantity(4, resource.DecimalSI),
+		v1.ResourceMemory: *resource.NewQuantity(100, resource.DecimalSI),
+		v1.ResourcePods:   *resource.NewQuantity(32, resource.DecimalSI),
 	}
 	n1, err := cs.CoreV1().Nodes().Create(ctx, node1, metav1.CreateOptions{})
 	if err != nil {
@@ -177,12 +190,14 @@ func TestTopologyMatchPlugin(t *testing.T) {
 	nodeName2 := "fake-node-2"
 	node2 := st.MakeNode().Name("fake-node-2").Label("node", nodeName2).Obj()
 	node2.Status.Allocatable = v1.ResourceList{
-		v1.ResourceCPU:  *resource.NewQuantity(4, resource.DecimalSI),
-		v1.ResourcePods: *resource.NewQuantity(32, resource.DecimalSI),
+		v1.ResourceCPU:    *resource.NewQuantity(4, resource.DecimalSI),
+		v1.ResourceMemory: *resource.NewQuantity(100, resource.DecimalSI),
+		v1.ResourcePods:   *resource.NewQuantity(32, resource.DecimalSI),
 	}
 	node2.Status.Capacity = v1.ResourceList{
-		v1.ResourceCPU:  *resource.NewQuantity(4, resource.DecimalSI),
-		v1.ResourcePods: *resource.NewQuantity(32, resource.DecimalSI),
+		v1.ResourceCPU:    *resource.NewQuantity(4, resource.DecimalSI),
+		v1.ResourceMemory: *resource.NewQuantity(100, resource.DecimalSI),
+		v1.ResourcePods:   *resource.NewQuantity(32, resource.DecimalSI),
 	}
 	n2, err := cs.CoreV1().Nodes().Create(ctx, node2, metav1.CreateOptions{})
 	if err != nil {
@@ -199,9 +214,9 @@ func TestTopologyMatchPlugin(t *testing.T) {
 		expectedNode           string
 	}{
 		{
-			name: "Filtering out nodes that cannot fit resources on a single numa node ",
+			name: "Filtering out nodes that cannot fit resources on a single numa node in case of Guranteed pod",
 			pods: []*v1.Pod{
-				withContainer(st.MakePod().Namespace(ns.Name).Name("topology-aware-scheduler-pod").Req(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Obj(), pause),
+				withContainer(st.MakePod().Namespace(ns.Name).Name("topology-aware-scheduler-pod").Req(map[v1.ResourceName]string{v1.ResourceCPU: "4", v1.ResourceMemory: "50"}).Obj(), pause, withResList("4", "50"), withResList("4", "50")),
 			},
 			nodeResourceTopologies: []*topologyv1alpha1.NodeResourceTopology{
 				{
@@ -301,7 +316,11 @@ func TestTopologyMatchPlugin(t *testing.T) {
 				t.Logf(" podList: %v", podList)
 
 				// The other pods should be scheduled on the small nodes.
-				if p.Spec.NodeName == tt.expectedNode {
+				nodeName, err := getNodeName(cs, ns.Name, p.Name)
+				if err != nil {
+					t.Log(err)
+				}
+				if nodeName == tt.expectedNode {
 					t.Logf("Pod %q is on a node as expected.", p.Name)
 					continue
 				} else {
@@ -315,6 +334,30 @@ func TestTopologyMatchPlugin(t *testing.T) {
 	}
 }
 
+// getNodeName returns the name of the node if a node has assigned to the given pod
+func getNodeName(c clientset.Interface, podNamespace, podName string) (string, error) {
+	pod, err := c.CoreV1().Pods(podNamespace).Get(context.TODO(), podName, metav1.GetOptions{})
+	if err != nil {
+		// This could be a connection error so we want to retry.
+		klog.Errorf("klog error %v", err)
+		return "", err
+	}
+	if pod.Spec.NodeName == "" {
+		return "", fmt.Errorf("Node not assigned")
+	}
+	return pod.Spec.NodeName, nil
+}
+
+func withResList(cpu, memory string) v1.ResourceList {
+	res := v1.ResourceList{}
+	if cpu != "" {
+		res[v1.ResourceCPU] = resource.MustParse(cpu)
+	}
+	if memory != "" {
+		res[v1.ResourceMemory] = resource.MustParse(memory)
+	}
+	return res
+}
 func makeNodeResourceTopologyCRD() *apiextensionsv1.CustomResourceDefinition {
 	return &apiextensionsv1.CustomResourceDefinition{
 		ObjectMeta: metav1.ObjectMeta{
@@ -426,8 +469,9 @@ func cleanupNodeResourceTopologies(ctx context.Context, topologyClient *topology
 	}
 }
 
-func withContainer(pod *v1.Pod, image string) *v1.Pod {
+func withContainer(pod *v1.Pod, image string, resRequests v1.ResourceList, resLimits v1.ResourceList) *v1.Pod {
 	pod.Spec.Containers[0].Name = "con0"
 	pod.Spec.Containers[0].Image = image
+	pod.Spec.Containers[0].Resources = v1.ResourceRequirements{Requests: resRequests, Limits: resLimits}
 	return pod
 }
